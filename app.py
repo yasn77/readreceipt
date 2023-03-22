@@ -5,10 +5,12 @@ from flask_sqlalchemy import SQLAlchemy
 from functools import wraps, update_wrapper
 import uuid
 import io
+import os
 
 app = Flask(__name__)
-#app.config ['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'
-app.config ['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:XXXXXX@XXXXX/readreceipt'
+# app.config ['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'
+# app.config ['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:XXXXXX@XXXXX/readreceipt'
+app.config ['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI')
 db = SQLAlchemy(app)
 
 class Recipients(db.Model):
