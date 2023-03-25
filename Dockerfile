@@ -10,4 +10,4 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends gcc libpq-dev python-dev \
     && pip install -r /src/requirements.txt
 WORKDIR /src
-CMD [ "flask", "run", "--port=8000" ]
+CMD [ "gunicorn", "--bind=0.0.0.0:8000", "app" ]
