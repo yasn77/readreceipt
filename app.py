@@ -43,6 +43,10 @@ def nocache(view):
 
     return update_wrapper(no_cache, view)
 
+@app.route("/")
+def root_path():
+    return ''
+
 @app.route("/new-uuid")
 def new_uuid():
     this_uuid = str(uuid.uuid4())
