@@ -3,6 +3,8 @@ from datetime import datetime
 from flask import Flask, request, send_file, json, make_response
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps, update_wrapper
+from sqlalchemy_utils import IPAddressType, CountryType, Country
+from ua_parser import user_agent_parser
 import uuid
 import io
 import os
@@ -26,6 +28,9 @@ class Tracking(db.Model):
     id = db.Column('tracking_id', db.Integer, primary_key = True)
     recipients_id = db.Column(db.Integer)
     timestamp = db.Column(db.DateTime)
+    ip_country = db.Column('IPCountry', CountryType)
+    connecting_ip = db.Column('ConnectingIP', IPAddressType)
+    user_agent = db.Column(db.String(255))
     details = db.Column(db.JSON)
 
     def __repr__(self):
@@ -84,12 +89,18 @@ def send_img(this_uuid):
     img.save(img_io, format="PNG")
     img_io.seek(0)
 
-    entry = Tracking(recipients_id=r_model.id, timestamp=datetime.now(),
-                     details=json.dumps(details))
+    ua = user_agent_parser.Parse(details['user_agent'])
 
-    db.session.add(entry)
-    db.session.commit()
-
+    if not ua["user_agent"]["family"] == "GmailImageProxy":
+        entry = Tracking(
+            recipients_id=r_model.id, 
+            timestamp=datetime.now(),
+            ip_country = request.headers.get('Cf-Ipcountry'),
+            connecting_ip = request.headers.get('Cf-Connecting-Ip'),
+            user_agent = details['user_agent'],
+            details=json.dumps(details)
+        )
+        db.session.add(entry)
+        db.session.commit()
 
     return send_file(img_io, download_name="1.png", mimetype='image/png')
-
