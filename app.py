@@ -2,6 +2,7 @@ from PIL import Image
 from datetime import datetime
 from flask import Flask, request, send_file, json, make_response
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from functools import wraps, update_wrapper
 from sqlalchemy_utils import IPAddressType, CountryType, Country
 from ua_parser import user_agent_parser
@@ -14,6 +15,7 @@ app = Flask(__name__)
 # app.config ['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:XXXXXX@XXXXX/readreceipt'
 app.config ['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI')
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
 class Recipients(db.Model):
     id = db.Column('recipient_id', db.Integer, primary_key = True)
