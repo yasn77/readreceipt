@@ -6,6 +6,7 @@ ENV PYTHONFAULTHANDLER 1
 
 COPY app.py /src/
 COPY requirements.txt /src/
+COPY migrations /src/
 RUN apt-get update \
     && apt-get install -y --no-install-recommends gcc libpq-dev python-dev \
     && pip install -r /src/requirements.txt
