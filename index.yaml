@@ -2,6 +2,16 @@ apiVersion: v1
 entries:
   readreceipt:
   - apiVersion: v2
+    appVersion: v0.1.2
+    created: "2023-04-08T23:10:34.003328538Z"
+    description: A Helm chart for Kubernetes
+    digest: fa14caa79f6e5d3e4973cda069f01111eca788835c6141bf510fd4310b21855b
+    name: readreceipt
+    type: application
+    urls:
+    - https://github.com/yasn77/readreceipt/releases/download/readreceipt-0.1.1/readreceipt-0.1.1.tgz
+    version: 0.1.1
+  - apiVersion: v2
     appVersion: 1.16.0
     created: "2023-03-23T17:22:46.284895737Z"
     description: A Helm chart for Kubernetes
@@ -11,4 +21,4 @@ entries:
     urls:
     - https://github.com/yasn77/readreceipt/releases/download/readreceipt-0.1.0/readreceipt-0.1.0.tgz
     version: 0.1.0
-generated: "2023-03-23T17:22:46.284901937Z"
+generated: "2023-04-08T23:10:34.003337438Z"
