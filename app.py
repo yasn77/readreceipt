@@ -54,9 +54,9 @@ def nocache(view: Callable) -> Callable:
     def no_cache(*args: Any, **kwargs: Any) -> Any:
         response = make_response(view(*args, **kwargs))
         response.headers["Last-Modified"] = datetime.now()
-        response.headers[
-            "Cache-Control"
-        ] = "no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0"
+        response.headers["Cache-Control"] = (
+            "no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0"
+        )
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "-1"
         return response
@@ -145,17 +145,20 @@ def admin_login() -> Any:
 def get_recipients() -> Any:
     """Get all recipients."""
     recipients = Recipients.query.all()
-    return json.jsonify(
-        [
-            {
-                "id": r.id,
-                "r_uuid": r.r_uuid,
-                "description": r.description,
-                "email": r.email,
-            }
-            for r in recipients
-        ]
-    ), 200
+    return (
+        json.jsonify(
+            [
+                {
+                    "id": r.id,
+                    "r_uuid": r.r_uuid,
+                    "description": r.description,
+                    "email": r.email,
+                }
+                for r in recipients
+            ]
+        ),
+        200,
+    )
 
 
 @app.route("/api/admin/recipients", methods=["POST"])
@@ -174,14 +177,17 @@ def create_recipient() -> Any:
     db.session.add(recipient)
     db.session.commit()
 
-    return json.jsonify(
-        {
-            "id": recipient.id,
-            "r_uuid": recipient.r_uuid,
-            "description": recipient.description,
-            "email": recipient.email,
-        }
-    ), 201
+    return (
+        json.jsonify(
+            {
+                "id": recipient.id,
+                "r_uuid": recipient.r_uuid,
+                "description": recipient.description,
+                "email": recipient.email,
+            }
+        ),
+        201,
+    )
 
 
 @app.route("/api/admin/recipients/<int:recipient_id>", methods=["PUT"])
@@ -197,14 +203,17 @@ def update_recipient(recipient_id: int) -> Any:
 
     db.session.commit()
 
-    return json.jsonify(
-        {
-            "id": recipient.id,
-            "r_uuid": recipient.r_uuid,
-            "description": recipient.description,
-            "email": recipient.email,
-        }
-    ), 200
+    return (
+        json.jsonify(
+            {
+                "id": recipient.id,
+                "r_uuid": recipient.r_uuid,
+                "description": recipient.description,
+                "email": recipient.email,
+            }
+        ),
+        200,
+    )
 
 
 @app.route("/api/admin/recipients/<int:recipient_id>", methods=["DELETE"])
@@ -230,35 +239,41 @@ def get_admin_stats() -> Any:
 
     recent_events = Tracking.query.order_by(Tracking.timestamp.desc()).limit(5).all()
 
-    return json.jsonify(
-        {
-            "total_recipients": total_recipients,
-            "total_events": total_events,
-            "events_today": events_today,
-            "unique_opens": Tracking.query.distinct(Tracking.recipients_id).count(),
-            "recent_events": [
-                {
-                    "email": Tracking.recipients_id,
-                    "timestamp": event.timestamp.isoformat()
-                    if event.timestamp
-                    else None,
-                }
-                for event in recent_events
-            ],
-        }
-    ), 200
+    return (
+        json.jsonify(
+            {
+                "total_recipients": total_recipients,
+                "total_events": total_events,
+                "events_today": events_today,
+                "unique_opens": Tracking.query.distinct(Tracking.recipients_id).count(),
+                "recent_events": [
+                    {
+                        "email": Tracking.recipients_id,
+                        "timestamp": (
+                            event.timestamp.isoformat() if event.timestamp else None
+                        ),
+                    }
+                    for event in recent_events
+                ],
+            }
+        ),
+        200,
+    )
 
 
 @app.route("/api/admin/settings", methods=["GET"])
 def get_settings() -> Any:
     """Get application settings."""
-    return json.jsonify(
-        {
-            "tracking_enabled": True,
-            "allowed_domains": os.environ.get("EXTENSION_ALLOWED_ORIGINS", ""),
-            "log_level": os.environ.get("LOG_LEVEL", "INFO"),
-        }
-    ), 200
+    return (
+        json.jsonify(
+            {
+                "tracking_enabled": True,
+                "allowed_domains": os.environ.get("EXTENSION_ALLOWED_ORIGINS", ""),
+                "log_level": os.environ.get("LOG_LEVEL", "INFO"),
+            }
+        ),
+        200,
+    )
 
 
 @app.route("/api/admin/settings", methods=["PUT"])
@@ -287,14 +302,17 @@ def get_analytics_summary() -> Any:
         .first()
     )
 
-    return json.jsonify(
-        {
-            "total_events": total_events,
-            "unique_recipients": unique_recipients,
-            "avg_daily_opens": round(avg_daily, 2),
-            "top_country": top_country[0] if top_country else None,
-        }
-    ), 200
+    return (
+        json.jsonify(
+            {
+                "total_events": total_events,
+                "unique_recipients": unique_recipients,
+                "avg_daily_opens": round(avg_daily, 2),
+                "top_country": top_country[0] if top_country else None,
+            }
+        ),
+        200,
+    )
 
 
 @app.route("/api/analytics/events", methods=["GET"])
@@ -314,9 +332,15 @@ def get_analytics_events() -> Any:
         if date_str:
             daily_counts[date_str] = daily_counts.get(date_str, 0) + 1
 
-    return json.jsonify(
-        [{"date": date, "count": count} for date, count in sorted(daily_counts.items())]
-    ), 200
+    return (
+        json.jsonify(
+            [
+                {"date": date, "count": count}
+                for date, count in sorted(daily_counts.items())
+            ]
+        ),
+        200,
+    )
 
 
 @app.route("/api/analytics/recipients", methods=["GET"])
@@ -330,9 +354,12 @@ def get_analytics_recipients() -> Any:
         .all()
     )
 
-    return json.jsonify(
-        [{"recipient_id": rid, "count": count} for rid, count in top_recipients]
-    ), 200
+    return (
+        json.jsonify(
+            [{"recipient_id": rid, "count": count} for rid, count in top_recipients]
+        ),
+        200,
+    )
 
 
 @app.route("/api/analytics/geo", methods=["GET"])
@@ -344,12 +371,15 @@ def get_analytics_geo() -> Any:
         .all()
     )
 
-    return json.jsonify(
-        [
-            {"country": country or "Unknown", "count": count}
-            for country, count in geo_data
-        ]
-    ), 200
+    return (
+        json.jsonify(
+            [
+                {"country": country or "Unknown", "count": count}
+                for country, count in geo_data
+            ]
+        ),
+        200,
+    )
 
 
 @app.route("/api/analytics/clients", methods=["GET"])
@@ -381,14 +411,17 @@ def get_analytics_clients() -> Any:
             except Exception:
                 client_counts["Unknown"] = client_counts.get("Unknown", 0) + 1
 
-    return json.jsonify(
-        [
-            {"name": name, "value": count}
-            for name, count in sorted(
-                client_counts.items(), key=lambda x: x[1], reverse=True
-            )
-        ]
-    ), 200
+    return (
+        json.jsonify(
+            [
+                {"name": name, "value": count}
+                for name, count in sorted(
+                    client_counts.items(), key=lambda x: x[1], reverse=True
+                )
+            ]
+        ),
+        200,
+    )
 
 
 @app.route("/api/analytics/export", methods=["GET"])
