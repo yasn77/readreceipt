@@ -25,4 +25,4 @@ types-flask==1.1.6
 pre-commit==3.6.0
 
 # Metrics (optional)
-prometheus-flask-exporter==0.23.0
+prometheus-flask-exporter==0.23.2
