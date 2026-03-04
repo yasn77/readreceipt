@@ -23,7 +23,7 @@ function Recipients() {
 
   const handleDelete = async (id) => {
     if (!confirm('Are you sure you want to delete this recipient?')) return
-    
+
     try {
       await adminApi.deleteRecipient(id)
       setRecipients(recipients.filter(r => r.id !== id))

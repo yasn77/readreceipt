@@ -22,7 +22,7 @@ As a system operator, I want the server to handle transient failures gracefully,
 1. **Database Writes**
    - Tracking event inserts
    - Recipient updates
-   
+
 2. **External APIs**
    - Any third-party integrations
    - Webhook notifications

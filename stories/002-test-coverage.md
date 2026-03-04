@@ -22,11 +22,11 @@ As a developer, I want comprehensive test coverage for all code, so that we can 
    - `/` - root path
    - `/new-uuid` - UUID generation
    - `/img/<uuid>` - tracking pixel endpoint
-   
+
 2. **Models**
    - `Recipients` model
    - `Tracking` model
-   
+
 3. **Utilities**
    - `nocache` decorator
    - UUID generation

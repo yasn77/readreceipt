@@ -44,11 +44,11 @@
 
     const uuid = generateUUID();
     const pixel = createTrackingPixel(uuid);
-    
+
     emailBody.appendChild(pixel);
-    
+
     console.log('[ReadReceipt] Tracking pixel injected:', uuid);
-    
+
     chrome.storage.local.set({ lastTrackedUUID: uuid });
   }
 
@@ -69,7 +69,7 @@
   function findComposeBody() {
     const composeDialog = document.querySelector('[role="dialog"][aria-label*="Compose"]');
     if (!composeDialog) return null;
-    
+
     return composeDialog.querySelector('[contenteditable="true"][aria-label*="Body"]');
   }
 
@@ -117,11 +117,11 @@
       console.log('[ReadReceipt] Tracking toggled:', trackingEnabled);
       sendResponse({ status: 'success' });
     }
-    
+
     if (message.action === 'getStatus') {
       sendResponse({ enabled: trackingEnabled });
     }
-    
+
     return true;
   });
 
@@ -130,11 +130,11 @@
    */
   function init() {
     loadSettings();
-    
+
     if (window.location.href.includes('mail.google.com')) {
       console.log('[ReadReceipt] Gmail detected, initializing...');
       initGmailObserver();
-      
+
       if (isGmailCompose()) {
         setTimeout(() => {
           const body = findComposeBody();

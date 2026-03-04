@@ -63,7 +63,7 @@ We should ask user any clarifications: e.g., prefer Flask/Django for admin? Use 
 
 Now produce plan.**🗂️ High‑Level Plan for the `readreceipt` Repository**
 
-Below is a detailed, step‑by‑step plan that covers every request you made while staying completely **read‑only** for now (no files will be changed, no commits will be made).  
+Below is a detailed, step‑by‑step plan that covers every request you made while staying completely **read‑only** for now (no files will be changed, no commits will be made).
 When you approve the plan we can switch to the execution phase, where the various agents will be launched, PRs created, reviews performed, CI pipelines added, etc.
 
 ---
