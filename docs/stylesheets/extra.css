@@ -1,0 +1,172 @@
+/* Extra CSS for Read Receipt Documentation */
+
+/* Custom code block styling */
+.highlight {
+  border-radius: 4px;
+  margin: 1em 0;
+}
+
+/* Custom admonition colors */
+.md-typeset .admonition.info,
+.md-typeset details.info {
+  border-color: rgb(0, 184, 212);
+}
+
+.md-typeset .admonition.info > .admonition-title,
+.md-typeset .admonition.info > summary {
+  background-color: rgba(0, 184, 212, 0.1);
+}
+
+.md-typeset .admonition.warning,
+.md-typeset details.warning {
+  border-color: rgb(255, 145, 0);
+}
+
+.md-typeset .admonition.warning > .admonition-title,
+.md-typeset .admonition.warning > summary {
+  background-color: rgba(255, 145, 0, 0.1);
+}
+
+/* Better table styling */
+.md-typeset table:not([class]) {
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.md-typeset table:not([class]) th {
+  background-color: var(--md-default-fg-color--lightest);
+  color: var(--md-default-fg-color);
+}
+
+/* Custom link styling */
+.md-typeset a {
+  text-decoration: underline;
+  text-decoration-color: var(--md-primary-fg-color);
+  text-underline-offset: 2px;
+}
+
+.md-typeset a:hover {
+  text-decoration-color: var(--md-accent-fg-color);
+}
+
+/* Code annotation improvements */
+.md-typeset .highlight .superfences-content {
+  background-color: var(--md-code-bg-color);
+  color: var(--md-code-fg-color);
+}
+
+/* Better navigation for large docs */
+.md-nav__item--section > .md-nav__link[for] {
+  font-weight: 600;
+}
+
+/* Custom footer */
+.md-footer {
+  background-color: var(--md-primary-fg-color--dark);
+}
+
+/* Print styles */
+@media print {
+  .md-header,
+  .md-tabs,
+  .md-footer {
+    display: none;
+  }
+}
+
+/* Dark mode improvements */
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #3f51b5;
+  --md-primary-fg-color--light: #5c6bc0;
+  --md-primary-fg-color--dark: #303f9f;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--md-default-bg-color);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--md-default-fg-color--lighter);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--md-default-fg-color--light);
+}
+
+/* Table of contents improvements */
+.md-sidebar--secondary .md-nav__link {
+  font-size: 0.85rem;
+}
+
+.md-sidebar--secondary .md-nav__link--active {
+  font-weight: 600;
+  color: var(--md-primary-fg-color);
+}
+
+/* Code block copy button positioning */
+.md-clipboard {
+  top: 0.5rem;
+  right: 0.5rem;
+}
+
+/* Better contrast for inline code */
+.md-typeset code {
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  background-color: var(--md-code-bg-color);
+  color: var(--md-code-fg-color);
+}
+
+/* Admonition icons */
+.md-typeset .admonition > .admonition-title::before,
+.md-typeset details > summary::before {
+  opacity: 1;
+}
+
+/* Search bar improvements */
+.md-search__input {
+  background-color: var(--md-default-fg-color--lighter);
+}
+
+.md-search__input:hover {
+  background-color: var(--md-default-fg-color--lightest);
+}
+
+/* Tabbed content improvements */
+.md-typeset .tabbed-content {
+  border-radius: 0 0 4px 4px;
+}
+
+.md-typeset .tabbed-labels {
+  background-color: var(--md-default-fg-color--lightest);
+  border-radius: 4px 4px 0 0;
+  padding: 0.5rem 1rem;
+}
+
+/* Annotation marker styling */
+.md-typeset .highlight .md-annotation span span {
+  background-color: var(--md-primary-fg-color);
+  color: var(--md-primary-bg-color);
+}
+
+/* Responsive improvements */
+@media screen and (max-width: 76.2344em) {
+  .md-nav--lifted > .md-nav__list > .md-nav__item--active > .md-nav__link {
+    background-color: var(--md-primary-fg-color--light);
+  }
+}
+
+/* Print-friendly code blocks */
+@media print {
+  .md-typeset pre > code {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}

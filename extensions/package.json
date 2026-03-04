@@ -1,0 +1,38 @@
+{
+  "name": "readreceipt-extensions",
+  "version": "0.2.0",
+  "description": "Browser extensions for Read Receipt functionality",
+  "private": true,
+  "scripts": {
+    "build": "npm run build:chrome && npm run build:firefox",
+    "build:chrome": "./build.sh chrome",
+    "build:firefox": "./build.sh firefox",
+    "build:all": "./build.sh all",
+    "package": "npm run package:chrome && npm run package:firefox",
+    "package:chrome": "./build.sh package-chrome",
+    "package:firefox": "./build.sh package-firefox",
+    "lint": "npm run lint:chrome && npm run lint:firefox",
+    "lint:chrome": "eslint chrome/*.js --env browser",
+    "lint:firefox": "eslint firefox/*.js --env browser",
+    "lint:fix": "eslint chrome/*.js firefox/*.js --env browser --fix",
+    "validate": "npm run validate:chrome && npm run validate:firefox",
+    "validate:chrome": "node scripts/validate-manifest.js chrome",
+    "validate:firefox": "node scripts/validate-manifest.js firefox",
+    "test": "node scripts/test-extensions.js",
+    "clean": "./build.sh clean",
+    "web-ext-lint:firefox": "web-ext lint --source-dir firefox"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "eslint-plugin-browser-compat": "^1.0.0",
+    "web-ext": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "webExt": {
+    "sourceDir": "firefox",
+    "artifactsDir": "../dist",
+    "filename": "readreceipt-firefox-{version}.xpi"
+  }
+}

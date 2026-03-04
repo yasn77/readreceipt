@@ -1,6 +1,42 @@
 # Contributing to Read Receipt
 
-Thank you for considering contributing to Read Receipt! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to Read Receipt! This document provides comprehensive guidelines and instructions for contributing.
+
+## Table of Contents
+
+- [Code of Conduct](#code-of-conduct)
+- [Getting Started](#getting-started)
+- [How to Contribute](#how-to-contribute)
+- [Development Setup](#development-setup)
+- [Coding Standards](#coding-standards)
+- [Testing](#testing)
+- [Submitting Changes](#submitting-changes)
+- [Code Review](#code-review)
+- [Recognition](#recognition)
+
+## Code of Conduct
+
+### Our Pledge
+
+We as members, contributors, and leaders pledge to make participation in our community a harassment-free experience for everyone.
+
+### Our Standards
+
+Examples of behaviour that contributes to a positive environment:
+
+- Using welcoming and inclusive language
+- Being respectful of differing viewpoints
+- Gracefully accepting constructive criticism
+- Focusing on what is best for the community
+- Showing empathy towards other community members
+
+Examples of unacceptable behaviour:
+
+- The use of sexualised language or imagery
+- Trolling, insulting/derogatory comments
+- Public or private harassment
+- Publishing others' private information without permission
+- Other conduct which could reasonably be considered inappropriate
 
 ## Development Setup
 
@@ -219,4 +255,33 @@ All PRs trigger the CI pipeline:
 
 Feel free to open an issue with the "question" label for any questions about contributing.
 
-Thank you for your contributions! 🎉
+## Getting Help
+
+- **Documentation:** Check [docs/](docs/)
+- **Issues:** [GitHub Issues](https://github.com/yasn77/readreceipt/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/yasn77/readreceipt/discussions)
+
+## Recognition
+
+### Contributors
+
+We recognise all contributors:
+- Name in CONTRIBUTORS file
+- GitHub profile in repository insights
+- Mention in release notes for significant contributions
+
+### Significant Contributions
+
+For major contributions:
+- Co-author credit on commits
+- Featured in release announcements
+- Invitation to become a maintainer (for sustained contributions)
+
+## Thank You!
+
+Your contributions make Read Receipt better for everyone. We appreciate your time and effort! 🎉
+
+---
+
+**Last Updated:** 2024-01-15  
+**License:** MIT

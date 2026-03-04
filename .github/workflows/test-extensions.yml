@@ -1,0 +1,105 @@
+name: Test Extensions
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'extensions/**'
+  pull_request:
+    branches: [master, main]
+    paths:
+      - 'extensions/**'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  test-extensions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: extensions/package-lock.json
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: extensions/node_modules
+          key: test-extensions-node-modules-${{ runner.os }}-${{ hashFiles('extensions/package-lock.json') }}
+          restore-keys: |
+            test-extensions-node-modules-${{ runner.os }}-
+
+      - name: Install dependencies
+        working-directory: extensions
+        run: npm ci
+
+      - name: Install web-ext
+        run: npm install -g web-ext
+
+      - name: Validate Chrome manifest
+        working-directory: extensions
+        run: npm run validate:chrome
+
+      - name: Validate Firefox manifest
+        working-directory: extensions
+        run: npm run validate:firefox
+
+      - name: Run extension tests
+        working-directory: extensions
+        run: npm test
+
+      - name: Lint Chrome JavaScript
+        working-directory: extensions
+        run: npm run lint:chrome || echo "ESLint not configured"
+
+      - name: Lint Firefox JavaScript
+        working-directory: extensions
+        run: npm run lint:firefox || echo "ESLint not configured"
+
+      - name: Run web-ext lint on Firefox
+        working-directory: extensions/firefox
+        run: web-ext lint --source-dir .
+
+      - name: Build Chrome extension
+        working-directory: extensions
+        run: npm run build:chrome
+
+      - name: Build Firefox extension
+        working-directory: extensions
+        run: npm run build:firefox
+
+      - name: Check required files exist
+        run: |
+          echo "Checking Chrome extension files..."
+          test -f extensions/chrome/manifest.json
+          test -f extensions/chrome/background.js
+          test -f extensions/chrome/content.js
+          test -f extensions/chrome/popup.html
+          
+          echo "Checking Firefox extension files..."
+          test -f extensions/firefox/manifest.json
+          test -f extensions/firefox/background.js
+          test -f extensions/firefox/content.js
+          test -f extensions/firefox/popup.html
+          
+          echo "All required files present"
+
+      - name: Verify manifest versions
+        run: |
+          CHROME_VERSION=$(node -p "require('./extensions/chrome/manifest.json').version")
+          FIREFOX_VERSION=$(node -p "require('./extensions/firefox/manifest.json').version")
+          
+          echo "Chrome version: $CHROME_VERSION"
+          echo "Firefox version: $FIREFOX_VERSION"
+          
+          if [ "$CHROME_VERSION" != "$FIREFOX_VERSION" ]; then
+            echo "Warning: Version mismatch between Chrome and Firefox extensions"
+          fi

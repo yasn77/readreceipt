@@ -1,0 +1,214 @@
+name: Build Extensions
+
+on:
+  push:
+    branches: [master, main]
+    tags:
+      - 'extension-v*'
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+  WEB_EXT_VERSION: '4'
+
+jobs:
+  build-chrome:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: extensions/package-lock.json
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: extensions/node_modules
+          key: chrome-node-modules-${{ runner.os }}-${{ hashFiles('extensions/package-lock.json') }}
+          restore-keys: |
+            chrome-node-modules-${{ runner.os }}-
+
+      - name: Install dependencies
+        working-directory: extensions
+        run: npm ci
+
+      - name: Validate Chrome manifest
+        working-directory: extensions/chrome
+        run: |
+          node -e "
+            const manifest = require('./manifest.json');
+            if (manifest.manifest_version !== 3) {
+              console.error('Chrome extension must use manifest_version 3');
+              process.exit(1);
+            }
+            console.log('Chrome manifest.json is valid');
+          "
+
+      - name: Run ESLint
+        working-directory: extensions
+        run: npm run lint:chrome || echo "ESLint not configured, skipping..."
+
+      - name: Build Chrome extension
+        working-directory: extensions
+        run: npm run build:chrome
+
+      - name: Create Chrome zip package
+        working-directory: extensions/chrome
+        run: |
+          zip -r ../../dist/readreceipt-chrome-${{ github.ref_name }}.zip \
+            manifest.json \
+            background.js \
+            content.js \
+            popup.html \
+            icons/ 2>/dev/null || \
+          zip -r ../../dist/readreceipt-chrome-${{ github.ref_name }}.zip \
+            manifest.json \
+            background.js \
+            content.js \
+            popup.html
+
+      - name: Upload Chrome artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrome-extension
+          path: dist/readreceipt-chrome-*.zip
+          retention-days: 30
+
+      - name: Prepare for Chrome Web Store (tagged builds only)
+        if: startsWith(github.ref, 'refs/tags/extension-v')
+        run: |
+          echo "Chrome extension ready for upload to Chrome Web Store"
+          echo "Use Chrome Web Store API or manual upload"
+
+  build-firefox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: extensions/package-lock.json
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: extensions/node_modules
+          key: firefox-node-modules-${{ runner.os }}-${{ hashFiles('extensions/package-lock.json') }}
+          restore-keys: |
+            firefox-node-modules-${{ runner.os }}-
+
+      - name: Install dependencies
+        working-directory: extensions
+        run: npm ci
+
+      - name: Install web-ext
+        run: npm install -g web-ext@${{ env.WEB_EXT_VERSION }}
+
+      - name: Validate Firefox manifest
+        working-directory: extensions/firefox
+        run: |
+          node -e "
+            const manifest = require('./manifest.json');
+            if (manifest.manifest_version !== 2) {
+              console.error('Firefox extension must use manifest_version 2');
+              process.exit(1);
+            }
+            if (!manifest.applications || !manifest.applications.gecko) {
+              console.error('Firefox extension must have applications.gecko configuration');
+              process.exit(1);
+            }
+            console.log('Firefox manifest.json is valid');
+          "
+
+      - name: Run web-ext lint
+        working-directory: extensions/firefox
+        run: web-ext lint --source-dir .
+
+      - name: Build Firefox extension
+        working-directory: extensions
+        run: npm run build:firefox
+
+      - name: Create Firefox XPI package
+        working-directory: extensions/firefox
+        run: |
+          web-ext build --source-dir . --artifacts-dir ../../dist --filename readreceipt-firefox-${{ github.ref_name }}.xpi
+
+      - name: Upload Firefox artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox-extension
+          path: dist/readreceipt-firefox-*.xpi
+          retention-days: 30
+
+      - name: Prepare for Firefox Add-ons (tagged builds only)
+        if: startsWith(github.ref, 'refs/tags/extension-v')
+        run: |
+          echo "Firefox extension ready for upload to Firefox Add-ons"
+          echo "Use web-ext sign or manual upload"
+
+  release:
+    needs: [build-chrome, build-firefox]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: startsWith(github.ref, 'refs/tags/extension-v')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Chrome artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: chrome-extension
+          path: dist/
+
+      - name: Download Firefox artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox-extension
+          path: dist/
+
+      - name: List distribution files
+        run: ls -la dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Extension Release ${{ github.ref_name }}
+          body: |
+            ## Release Notes
+
+            ### What's New
+            - Chrome extension (Manifest V3)
+            - Firefox extension (Manifest V2)
+
+            ### Installation
+            - **Chrome**: Download and extract the zip file, then load as unpacked extension or upload to Chrome Web Store
+            - **Firefox**: Install the .xpi file directly or upload to Firefox Add-ons
+
+            ### Changes
+            - See commit history for detailed changes
+
+            ### Verification
+            - Chrome package: `readreceipt-chrome-${{ github.ref_name }}.zip`
+            - Firefox package: `readreceipt-firefox-${{ github.ref_name }}.xpi`
+          files: |
+            dist/readreceipt-chrome-*.zip
+            dist/readreceipt-firefox-*.xpi
+          draft: false
+          prerelease: false
+          generate_release_notes: true

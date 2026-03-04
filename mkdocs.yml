@@ -1,0 +1,229 @@
+# MkDocs Configuration for Read Receipt Documentation
+# https://www.mkdocs.org/user-guide/configuration/
+
+site_name: Read Receipt Documentation
+site_description: Comprehensive documentation for the Read Receipt email tracking system
+site_author: Read Receipt Team
+site_url: https://readreceipt.docs.yourdomain.com
+
+# Repository
+repo_name: yasn77/readreceipt
+repo_url: https://github.com/yasn77/readreceipt
+edit_uri: edit/master/docs/
+
+# Copyright
+copyright: Copyright &copy; 2024 Read Receipt Team
+
+# Theme configuration
+theme:
+  name: material
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+  # Features
+  features:
+    # Navigation
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - navigation.top
+
+    # Search
+    - search.suggest
+    - search.highlight
+    - search.share
+
+    # Content
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - content.tooltips
+
+    # Header
+    - header.autohide
+
+  # Logo and favicon
+  logo: assets/logo.png
+  favicon: assets/favicon.ico
+
+  # Language
+  language: en
+
+  # Font configuration
+  font:
+    text: Roboto
+    code: Roboto Mono
+
+# Customisation
+extra:
+  # Social links
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/yasn77/readreceipt
+      name: Read Receipt on GitHub
+    - icon: fontawesome/brands/docker
+      link: https://hub.docker.com/r/yasn77/readreceipt
+      name: Docker Hub
+
+  # Version selector (if using mike for versioning)
+  # version:
+  #   provider: mike
+
+# Extensions
+markdown_extensions:
+  # Python Markdown
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - meta
+  - md_in_html
+  - toc:
+      permalink: true
+      permalink_title: Anchor link to this section
+
+  # Python Markdown Extensions
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      normalize_issue_symbols: true
+      repo_url_shorthand: true
+      user: yasn77
+      repo: readreceipt
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      auto_append:
+        - includes/mkdocs.md
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      combine_header_slug: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+# Plugins
+plugins:
+  # Search (required for search functionality)
+  - search:
+      lang: en
+      separator: '[\s\-,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
+
+  # Git revision dates
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: timeago
+      locale: en
+      fallback_to_build_date: true
+
+  # Minify HTML
+  - minify:
+      minify_html: true
+
+  # Redirects (if needed)
+  # - redirects:
+  #     redirect_maps:
+  #       'old-page.md': 'new-page.md'
+
+  # OpenGraph social cards
+  # - social:
+  #     cards_layout_options:
+  #       background_color: "#3f51b5"
+  #       color: "#ffffff"
+
+# Extra CSS
+extra_css:
+  - stylesheets/extra.css
+
+# Extra JavaScript
+extra_javascript:
+  - javascripts/extra.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+# Navigation structure
+nav:
+  - Home:
+    - Read Receipt: index.md
+    - Getting Started: getting-started.md
+    - Quick Start: quick-start.md
+
+  - User Guide:
+    - Admin Dashboard: admin-guide.md
+    - Browser Extensions: extension-guide.md
+    - Analytics: analytics.md
+    - FAQ: faq.md
+
+  - Developer Guide:
+    - Architecture: architecture.md
+    - API Reference: api-reference.md
+    - Development: development.md
+    - Testing: testing.md
+
+  - Deployment:
+    - Overview: deployment.md
+    - Docker: deployment/docker.md
+    - Kubernetes: deployment/kubernetes.md
+    - Traditional Server: deployment/traditional.md
+    - Environment Variables: deployment/environment.md
+    - Production Checklist: deployment/checklist.md
+
+  - Support:
+    - Troubleshooting: troubleshooting.md
+    - Known Issues: known-issues.md
+    - Getting Help: support.md
+    - Changelog: changelog.md
+
+# Hooks for customisation
+# hooks:
+#   - hooks/extra.py
+
+# Validation
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+# Watch for changes during development
+watch:
+  - docs/
+  - includes/
+  - overrides/
