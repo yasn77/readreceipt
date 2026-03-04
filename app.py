@@ -1,14 +1,19 @@
-from PIL import Image
-from datetime import datetime
-from flask import Flask, request, send_file, json, make_response
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from functools import wraps, update_wrapper
-from sqlalchemy_utils import IPAddressType, CountryType, Country
-from ua_parser import user_agent_parser
-import uuid
+from __future__ import annotations
+
 import io
 import os
+import uuid
+from collections.abc import Callable
+from datetime import datetime
+from functools import update_wrapper, wraps
+from typing import Any
+
+from flask import Flask, json, make_response, request, send_file
+from flask_migrate import Migrate
+from flask_sqlalchemy import SQLAlchemy
+from PIL import Image
+from sqlalchemy_utils import CountryType, IPAddressType
+from ua_parser import user_agent_parser
 
 app = Flask(__name__)
 # app.config ['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'
@@ -21,17 +26,17 @@ db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
 
-class Recipients(db.Model):
+class Recipients(db.Model):  # type: ignore[name-defined]
     id = db.Column("recipient_id", db.Integer, primary_key=True)
     r_uuid = db.Column(db.String(36))
     description = db.Column(db.String(200))
     email = db.Column(db.String(100))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Recipients {self.r_uuid}>"
 
 
-class Tracking(db.Model):
+class Tracking(db.Model):  # type: ignore[name-defined]
     id = db.Column("tracking_id", db.Integer, primary_key=True)
     recipients_id = db.Column(db.Integer)
     timestamp = db.Column(db.DateTime)
@@ -40,13 +45,13 @@ class Tracking(db.Model):
     user_agent = db.Column(db.String(255))
     details = db.Column(db.JSON)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Tracking {self.id}>"
 
 
-def nocache(view):
+def nocache(view: Callable) -> Callable:
     @wraps(view)
-    def no_cache(*args, **kwargs):
+    def no_cache(*args: Any, **kwargs: Any) -> Any:
         response = make_response(view(*args, **kwargs))
         response.headers["Last-Modified"] = datetime.now()
         response.headers["Cache-Control"] = (
@@ -60,12 +65,12 @@ def nocache(view):
 
 
 @app.route("/")
-def root_path():
+def root_path() -> str:
     return ""
 
 
 @app.route("/new-uuid")
-def new_uuid():
+def new_uuid() -> str:
     this_uuid = str(uuid.uuid4())
     description = request.args.get("description")
     email = request.args.get("email")
@@ -84,13 +89,13 @@ def new_uuid():
 
 @app.route("/img/<this_uuid>")
 @nocache
-def send_img(this_uuid):
+def send_img(this_uuid: str) -> Any:
     r_model = Recipients.query.filter_by(r_uuid=this_uuid).first()
 
     if r_model is None:
         return json.jsonify({"error": "Recipient not found"}), 404
 
-    details = dict()
+    details: dict[str, Any] = {}
     details["user_agent"] = request.headers.get("User-Agent")
     details["headers"] = dict(request.headers)
     details["remote_addr"] = request.remote_addr
@@ -124,7 +129,7 @@ def send_img(this_uuid):
 
 
 @app.route("/api/admin/login", methods=["POST"])
-def admin_login():
+def admin_login() -> Any:
     """Admin login endpoint with token authentication."""
     data = request.get_json()
     token = data.get("token")
@@ -137,7 +142,7 @@ def admin_login():
 
 
 @app.route("/api/admin/recipients", methods=["GET"])
-def get_recipients():
+def get_recipients() -> Any:
     """Get all recipients."""
     recipients = Recipients.query.all()
     return json.jsonify(
@@ -154,7 +159,7 @@ def get_recipients():
 
 
 @app.route("/api/admin/recipients", methods=["POST"])
-def create_recipient():
+def create_recipient() -> Any:
     """Create a new recipient."""
     data = request.get_json()
 
@@ -180,7 +185,7 @@ def create_recipient():
 
 
 @app.route("/api/admin/recipients/<int:recipient_id>", methods=["PUT"])
-def update_recipient(recipient_id):
+def update_recipient(recipient_id: int) -> Any:
     """Update a recipient."""
     recipient = Recipients.query.get_or_404(recipient_id)
     data = request.get_json()
@@ -203,7 +208,7 @@ def update_recipient(recipient_id):
 
 
 @app.route("/api/admin/recipients/<int:recipient_id>", methods=["DELETE"])
-def delete_recipient(recipient_id):
+def delete_recipient(recipient_id: int) -> Any:
     """Delete a recipient."""
     recipient = Recipients.query.get_or_404(recipient_id)
     db.session.delete(recipient)
@@ -213,7 +218,7 @@ def delete_recipient(recipient_id):
 
 
 @app.route("/api/admin/stats", methods=["GET"])
-def get_admin_stats():
+def get_admin_stats() -> Any:
     """Get dashboard statistics."""
     total_recipients = Recipients.query.count()
     total_events = Tracking.query.count()
@@ -245,7 +250,7 @@ def get_admin_stats():
 
 
 @app.route("/api/admin/settings", methods=["GET"])
-def get_settings():
+def get_settings() -> Any:
     """Get application settings."""
     return json.jsonify(
         {
@@ -257,14 +262,14 @@ def get_settings():
 
 
 @app.route("/api/admin/settings", methods=["PUT"])
-def update_settings():
+def update_settings() -> Any:
     """Update application settings (in-memory for now)."""
     data = request.get_json()
     return json.jsonify({"status": "updated", "settings": data}), 200
 
 
 @app.route("/api/analytics/summary", methods=["GET"])
-def get_analytics_summary():
+def get_analytics_summary() -> Any:
     """Get analytics summary."""
     total_events = Tracking.query.count()
     unique_recipients = Tracking.query.distinct(Tracking.recipients_id).count()
@@ -293,7 +298,7 @@ def get_analytics_summary():
 
 
 @app.route("/api/analytics/events", methods=["GET"])
-def get_analytics_events():
+def get_analytics_events() -> Any:
     """Get time-series event data."""
     from datetime import datetime, timedelta
 
@@ -303,7 +308,7 @@ def get_analytics_events():
 
     events = Tracking.query.filter(Tracking.timestamp >= start_date).all()
 
-    daily_counts = {}
+    daily_counts: dict[str, int] = {}
     for event in events:
         date_str = event.timestamp.strftime("%Y-%m-%d") if event.timestamp else None
         if date_str:
@@ -315,7 +320,7 @@ def get_analytics_events():
 
 
 @app.route("/api/analytics/recipients", methods=["GET"])
-def get_analytics_recipients():
+def get_analytics_recipients() -> Any:
     """Get top recipients by opens."""
     top_recipients = (
         db.session.query(Tracking.recipients_id, db.func.count(Tracking.id))
@@ -331,7 +336,7 @@ def get_analytics_recipients():
 
 
 @app.route("/api/analytics/geo", methods=["GET"])
-def get_analytics_geo():
+def get_analytics_geo() -> Any:
     """Get geographic distribution."""
     geo_data = (
         db.session.query(Tracking.ip_country, db.func.count(Tracking.id))
@@ -348,10 +353,10 @@ def get_analytics_geo():
 
 
 @app.route("/api/analytics/clients", methods=["GET"])
-def get_analytics_clients():
+def get_analytics_clients() -> Any:
     """Get email client breakdown."""
     events = Tracking.query.all()
-    client_counts = {}
+    client_counts: dict[str, int] = {}
 
     for event in events:
         if event.details:
@@ -387,7 +392,7 @@ def get_analytics_clients():
 
 
 @app.route("/api/analytics/export", methods=["GET"])
-def export_analytics():
+def export_analytics() -> Any:
     """Export analytics data as CSV."""
     import csv
     from io import StringIO

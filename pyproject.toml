@@ -32,15 +32,16 @@ no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 strict_equality = true
+exclude = ["migrations", "admin-dashboard", "extensions"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "--cov=readreceipt --cov-report=term-missing --cov-fail-under=90 -v"
+addopts = "--cov=app --cov-report=term-missing --cov-fail-under=90 -v"
 
 [tool.coverage.run]
-source = ["app"]
+source = ["."]
 omit = [
     "tests/*",
     "*/migrations/*",
@@ -49,6 +50,7 @@ omit = [
     "admin-dashboard/*",
     "extensions/*",
     "venv/*",
+    ".venv/*",
 ]
 
 [tool.coverage.report]
