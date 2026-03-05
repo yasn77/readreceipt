@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import csv
 import io
 import logging
 import os
 import re
 import uuid
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import update_wrapper, wraps
+from io import StringIO
 from typing import Any
 
 import bleach
@@ -41,6 +43,10 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", os.urandom(32).hex())
+
+# Validate required environment variables at startup
+if not os.environ.get("ADMIN_TOKEN"):
+    raise RuntimeError("ADMIN_TOKEN environment variable is required but not set")
 
 # Retry configuration
 app.config["RETRY_MAX_ATTEMPTS"] = int(os.environ.get("RETRY_MAX_ATTEMPTS", "5"))
@@ -327,6 +333,40 @@ def nocache(view: Callable) -> Callable:
     return update_wrapper(no_cache, view)
 
 
+def require_auth(view: Callable) -> Callable:
+    """Decorator to require authentication for admin endpoints.
+
+    Validates the Authorization header contains a valid admin token.
+    Returns 401 if authentication fails.
+    """
+
+    @wraps(view)
+    def decorated_function(*args: Any, **kwargs: Any) -> Any:
+        auth_header = request.headers.get("Authorization")
+        if not auth_header:
+            logger.warning("Missing Authorization header")
+            return json.jsonify({"error": "Missing Authorization header"}), 401
+
+        # Support "Bearer <token>" format
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+        else:
+            token = auth_header
+
+        admin_token = os.environ.get("ADMIN_TOKEN")
+        if not admin_token:
+            logger.error("ADMIN_TOKEN not configured")
+            return json.jsonify({"error": "Server configuration error"}), 500
+
+        if token != admin_token:
+            logger.warning("Invalid admin token provided")
+            return json.jsonify({"error": "Invalid token"}), 401
+
+        return view(*args, **kwargs)
+
+    return decorated_function
+
+
 @app.route("/")
 def root_path() -> str:
     return ""
@@ -441,7 +481,11 @@ def admin_login() -> Any:
     # Sanitise token input
     token = bleach.clean(token, tags=[], strip=True)
 
-    admin_token = os.environ.get("ADMIN_TOKEN", "admin")
+    admin_token = os.environ.get("ADMIN_TOKEN")
+    # This should never be None due to startup validation, but check for safety
+    if not admin_token:
+        logger.error("ADMIN_TOKEN not configured")
+        return json.jsonify({"error": "Server configuration error"}), 500
 
     if token == admin_token:
         logger.info("Admin login successful")
@@ -452,6 +496,7 @@ def admin_login() -> Any:
 
 @app.route("/api/admin/recipients", methods=["GET"])
 @limiter.limit("30 per minute")
+@require_auth
 def get_recipients() -> Any:
     """Get all recipients."""
     logger.info("Fetching all recipients")
@@ -474,6 +519,7 @@ def get_recipients() -> Any:
 
 @app.route("/api/admin/recipients", methods=["POST"])
 @limiter.limit("30 per minute")
+@require_auth
 def create_recipient() -> Any:
     """Create a new recipient."""
     data = request.get_json()
@@ -502,7 +548,9 @@ def create_recipient() -> Any:
     description = data.get("description", "")
     if description and (not isinstance(description, str) or len(description) > 200):
         logger.warning("Create recipient failed: invalid description")
-        return json.jsonify({"error": "Description must be string and max 200 chars"}), 400
+        return json.jsonify(
+            {"error": "Description must be string and max 200 chars"}
+        ), 400
 
     # Sanitise inputs
     email = cleaned_email
@@ -544,6 +592,7 @@ def create_recipient() -> Any:
 
 @app.route("/api/admin/recipients/<int:recipient_id>", methods=["PUT"])
 @limiter.limit("30 per minute")
+@require_auth
 def update_recipient(recipient_id: int) -> Any:
     """Update a recipient."""
     recipient = Recipients.query.get_or_404(recipient_id)
@@ -594,6 +643,7 @@ def update_recipient(recipient_id: int) -> Any:
 
 @app.route("/api/admin/recipients/<int:recipient_id>", methods=["DELETE"])
 @limiter.limit("30 per minute")
+@require_auth
 def delete_recipient(recipient_id: int) -> Any:
     """Delete a recipient."""
     recipient = Recipients.query.get_or_404(recipient_id)
@@ -617,12 +667,11 @@ def delete_recipient(recipient_id: int) -> Any:
 
 @app.route("/api/admin/stats", methods=["GET"])
 @limiter.limit("30 per minute")
+@require_auth
 def get_admin_stats() -> Any:
     """Get dashboard statistics."""
     total_recipients = Recipients.query.count()
     total_events = Tracking.query.count()
-
-    from datetime import datetime, timedelta
 
     yesterday = datetime.now() - timedelta(days=1)
     events_today = Tracking.query.filter(Tracking.timestamp >= yesterday).count()
@@ -638,7 +687,7 @@ def get_admin_stats() -> Any:
                 "unique_opens": Tracking.query.distinct(Tracking.recipients_id).count(),
                 "recent_events": [
                     {
-                        "email": Tracking.recipients_id,
+                        "email": event.recipients_id,
                         "timestamp": (
                             event.timestamp.isoformat() if event.timestamp else None
                         ),
@@ -653,6 +702,7 @@ def get_admin_stats() -> Any:
 
 @app.route("/api/admin/settings", methods=["GET"])
 @limiter.limit("30 per minute")
+@require_auth
 def get_settings() -> Any:
     """Get application settings."""
     return (
@@ -669,6 +719,7 @@ def get_settings() -> Any:
 
 @app.route("/api/admin/settings", methods=["PUT"])
 @limiter.limit("30 per minute")
+@require_auth
 def update_settings() -> Any:
     """Update application settings (in-memory for now)."""
     data = request.get_json()
@@ -706,12 +757,11 @@ def update_settings() -> Any:
 
 @app.route("/api/analytics/summary", methods=["GET"])
 @limiter.limit("60 per minute")
+@require_auth
 def get_analytics_summary() -> Any:
     """Get analytics summary."""
     total_events = Tracking.query.count()
     unique_recipients = Tracking.query.distinct(Tracking.recipients_id).count()
-
-    from datetime import datetime, timedelta
 
     last_week = datetime.now() - timedelta(days=7)
     events_last_week = Tracking.query.filter(Tracking.timestamp >= last_week).count()
@@ -739,12 +789,28 @@ def get_analytics_summary() -> Any:
 
 @app.route("/api/analytics/events", methods=["GET"])
 @limiter.limit("60 per minute")
+@require_auth
 def get_analytics_events() -> Any:
     """Get time-series event data."""
-    from datetime import datetime, timedelta
-
     range_days = request.args.get("range", "7d")
-    days = int(range_days.replace("d", ""))
+
+    # Validate range parameter
+    try:
+        if not range_days or not isinstance(range_days, str):
+            return json.jsonify({"error": "Invalid range parameter"}), 400
+
+        # Extract days from format like "7d", "30d", etc.
+        if not range_days.endswith("d"):
+            return json.jsonify({"error": "Range must be in format like '7d'"}), 400
+
+        days = int(range_days[:-1])
+
+        # Validate range is reasonable (1-365 days)
+        if days < 1 or days > 365:
+            return json.jsonify({"error": "Range must be between 1 and 365 days"}), 400
+    except (ValueError, AttributeError):
+        return json.jsonify({"error": "Invalid range format"}), 400
+
     start_date = datetime.now() - timedelta(days=days)
 
     events = Tracking.query.filter(Tracking.timestamp >= start_date).all()
@@ -768,6 +834,7 @@ def get_analytics_events() -> Any:
 
 @app.route("/api/analytics/recipients", methods=["GET"])
 @limiter.limit("60 per minute")
+@require_auth
 def get_analytics_recipients() -> Any:
     """Get top recipients by opens."""
     top_recipients = (
@@ -788,6 +855,7 @@ def get_analytics_recipients() -> Any:
 
 @app.route("/api/analytics/geo", methods=["GET"])
 @limiter.limit("60 per minute")
+@require_auth
 def get_analytics_geo() -> Any:
     """Get geographic distribution."""
     geo_data = (
@@ -809,6 +877,7 @@ def get_analytics_geo() -> Any:
 
 @app.route("/api/analytics/clients", methods=["GET"])
 @limiter.limit("60 per minute")
+@require_auth
 def get_analytics_clients() -> Any:
     """Get email client breakdown."""
     events = Tracking.query.all()
@@ -852,11 +921,9 @@ def get_analytics_clients() -> Any:
 
 @app.route("/api/analytics/export", methods=["GET"])
 @limiter.limit("60 per minute")
+@require_auth
 def export_analytics() -> Any:
     """Export analytics data as CSV."""
-    import csv
-    from io import StringIO
-
     events = Tracking.query.all()
 
     output = StringIO()

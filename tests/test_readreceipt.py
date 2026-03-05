@@ -121,11 +121,9 @@ class TestTracking:
 class TestAdminEndpoints:
     """Tests for admin API endpoints."""
 
-    def test_admin_login_success(self, client: Any) -> None:
+    def test_admin_login_success(self, client: Any, monkeypatch: Any) -> None:
         """Test successful admin login."""
-        import os
-
-        os.environ["ADMIN_TOKEN"] = "test-token"
+        monkeypatch.setenv("ADMIN_TOKEN", "test-token")
 
         response = client.post(
             "/api/admin/login",

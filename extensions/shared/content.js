@@ -1,8 +1,8 @@
-// Chrome extension content script - imports from shared
-// This file is a wrapper that loads the shared content script
-// For Chrome MV3, this file is referenced in manifest.json
+/**
+ * Content script for Read Receipt extension
+ * Injects tracking pixel into Gmail compose window
+ */
 
-// Import shared content script code
 (function() {
   'use strict';
 

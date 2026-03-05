@@ -15,6 +15,8 @@ function Login({ onLogin }) {
 
     try {
       await adminApi.login(token)
+      // NOTE: Token stored in localStorage is vulnerable to XSS attacks.
+      // In production, use HttpOnly cookies for secure token storage.
       localStorage.setItem('adminToken', token)
       onLogin()
       navigate('/')
