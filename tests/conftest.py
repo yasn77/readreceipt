@@ -14,6 +14,8 @@ def set_test_env():
     # Set test values
     os.environ["ADMIN_TOKEN"] = "test-token"
     os.environ["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
+    # Disable rate limiting for tests
+    os.environ["FLASK_RATELIMIT_ENABLED"] = "false"
 
     yield
 

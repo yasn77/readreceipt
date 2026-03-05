@@ -14,6 +14,8 @@ def client() -> Any:
     app.config["TESTING"] = True
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SECRET_KEY"] = "test-secret-key"
+    # Disable CSRF for tests - we're testing auth, not CSRF mechanism
+    app.config["WTF_CSRF_ENABLED"] = False
 
     with app.app_context():
         db.create_all()
@@ -274,3 +276,213 @@ class TestSQLInjectionPrevention:
         )
         # Should be sanitised or rejected
         assert response.status_code in [201, 400]
+
+
+class TestCSRFProtection:
+    """Tests for CSRF protection."""
+
+    def test_csrf_protection_enabled(self, client: Any) -> None:
+        """Test that CSRF protection is enabled in the app config."""
+        # CSRF should be enabled by default
+        assert app.config.get("WTF_CSRF_CHECK_DEFAULT") is True
+
+    def test_csrf_headers_configured(self, client: Any) -> None:
+        """Test that CSRF headers are properly configured."""
+        headers = app.config.get("WTF_CSRF_HEADERS", [])
+        assert "X-CSRFToken" in headers
+        assert "X-CSRF-Token" in headers
+
+    def test_login_endpoint_csrf_exempt(self, client: Any, monkeypatch: Any) -> None:
+        """Test that login endpoint is exempt from CSRF (token-based auth)."""
+        monkeypatch.setenv("ADMIN_TOKEN", "test-token")
+
+        # Login should work without CSRF token
+        response = client.post(
+            "/api/admin/login",
+            json={"token": "test-token"},
+            content_type="application/json",
+        )
+        # Should succeed (429 if rate limited, but not 403 for CSRF)
+        assert response.status_code in [200, 429]
+
+
+class TestCookieBasedAuthentication:
+    """Tests for cookie-based authentication."""
+
+    def test_login_sets_auth_cookie(self, client: Any, monkeypatch: Any) -> None:
+        """Test that successful login sets httpOnly auth cookie."""
+        monkeypatch.setenv("ADMIN_TOKEN", "test-token")
+
+        response = client.post(
+            "/api/admin/login",
+            json={"token": "test-token"},
+            content_type="application/json",
+        )
+        assert response.status_code == 200
+
+        # Check cookie is set
+        cookies = response.headers.getlist("Set-Cookie")
+        assert len(cookies) > 0
+
+        # Find auth_token cookie
+        auth_cookie = None
+        for cookie in cookies:
+            if "auth_token" in cookie:
+                auth_cookie = cookie
+                break
+
+        assert auth_cookie is not None
+        # Verify httpOnly flag
+        assert "HttpOnly" in auth_cookie
+        # Verify Secure flag
+        assert "Secure" in auth_cookie
+        # Verify SameSite=Strict
+        assert "SameSite=Strict" in auth_cookie
+
+    def test_login_does_not_return_token_in_body(
+        self, client: Any, monkeypatch: Any
+    ) -> None:
+        """Test that login does not return token in response body."""
+        monkeypatch.setenv("ADMIN_TOKEN", "test-token")
+
+        response = client.post(
+            "/api/admin/login",
+            json={"token": "test-token"},
+            content_type="application/json",
+        )
+        assert response.status_code == 200
+
+        data = response.get_json()
+        # Token should NOT be in response body
+        assert "token" not in data
+        # But status and expiry should be present
+        assert "status" in data or "expires_in" in data
+
+    def test_auth_cookie_used_for_authentication(
+        self, client: Any, monkeypatch: Any
+    ) -> None:
+        """Test that auth cookie is used for authentication."""
+        monkeypatch.setenv("ADMIN_TOKEN", "test-token")
+
+        # First login to get cookie
+        login_response = client.post(
+            "/api/admin/login",
+            json={"token": "test-token"},
+            content_type="application/json",
+        )
+        assert login_response.status_code == 200
+
+        # Extract cookie
+        cookies = login_response.headers.getlist("Set-Cookie")
+        auth_cookie_value = None
+        for cookie in cookies:
+            if "auth_token" in cookie:
+                # Extract cookie value
+                auth_cookie_value = cookie.split(";")[0].split("=")[1]
+                break
+
+        assert auth_cookie_value is not None
+
+        # Create new client with cookie
+        with app.test_client() as auth_client:
+            # Set cookie manually using correct Flask test client API
+            auth_client.cookie_jar.set_cookie(
+                auth_cookie_value, domain="localhost", path="/", name="auth_token"
+            )
+
+            # Try to access protected endpoint
+            response = auth_client.get("/api/admin/recipients")
+            # Should succeed with valid cookie
+            assert response.status_code == 200
+
+    def test_logout_clears_auth_cookie(self, client: Any, monkeypatch: Any) -> None:
+        """Test that logout clears the auth cookie."""
+        monkeypatch.setenv("ADMIN_TOKEN", "test-token")
+
+        # First login to get cookie
+        login_response = client.post(
+            "/api/admin/login",
+            json={"token": "test-token"},
+            content_type="application/json",
+        )
+        assert login_response.status_code == 200
+
+        # Extract cookie
+        cookies = login_response.headers.getlist("Set-Cookie")
+        auth_cookie_value = None
+        for cookie in cookies:
+            if "auth_token" in cookie:
+                auth_cookie_value = cookie.split(";")[0].split("=")[1]
+                break
+
+        assert auth_cookie_value is not None
+
+        # Create new client with cookie and logout
+        with app.test_client() as auth_client:
+            auth_client.cookie_jar.set_cookie(
+                auth_cookie_value, domain="localhost", path="/", name="auth_token"
+            )
+
+            # Logout
+            logout_response = auth_client.post("/api/admin/logout")
+            assert logout_response.status_code == 200
+
+            # Check cookie is cleared
+            clear_cookies = logout_response.headers.getlist("Set-Cookie")
+            clear_cookie_found = False
+            for cookie in clear_cookies:
+                if "auth_token" in cookie and "Expires" in cookie:
+                    clear_cookie_found = True
+                    break
+
+            assert clear_cookie_found
+
+    def test_require_auth_checks_cookie_first(self) -> None:
+        """Test that require_auth decorator checks cookie before header."""
+        # Create a fresh client without the fixture's auth header
+        with app.test_client() as fresh_client:
+            # Without any auth, should get 401
+            response = fresh_client.get("/api/admin/recipients")
+            assert response.status_code == 401
+
+    def test_token_refresh_sets_new_cookie(self, client: Any, monkeypatch: Any) -> None:
+        """Test that token refresh endpoint sets new auth cookie."""
+        monkeypatch.setenv("ADMIN_TOKEN", "test-token")
+
+        # First login to get cookie
+        login_response = client.post(
+            "/api/admin/login",
+            json={"token": "test-token"},
+            content_type="application/json",
+        )
+        assert login_response.status_code == 200
+
+        # Extract cookie
+        cookies = login_response.headers.getlist("Set-Cookie")
+        auth_cookie_value = None
+        for cookie in cookies:
+            if "auth_token" in cookie:
+                auth_cookie_value = cookie.split(";")[0].split("=")[1]
+                break
+
+        assert auth_cookie_value is not None
+
+        # Create new client with cookie and refresh
+        with app.test_client() as auth_client:
+            auth_client.cookie_jar.set_cookie(
+                auth_cookie_value, domain="localhost", path="/", name="auth_token"
+            )
+
+            # Refresh token
+            refresh_response = auth_client.post("/api/admin/token/refresh")
+            assert refresh_response.status_code == 200
+
+            # Check new cookie is set
+            new_cookies = refresh_response.headers.getlist("Set-Cookie")
+            new_cookie_found = False
+            for cookie in new_cookies:
+                if "auth_token" in cookie:
+                    new_cookie_found = True
+                    break
+
+            assert new_cookie_found

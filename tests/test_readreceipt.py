@@ -15,6 +15,8 @@ def client() -> Generator[Any, None, None]:
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
     app.config["TESTING"] = True
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    # Disable CSRF for tests that don't need it (login endpoint is exempt anyway)
+    app.config["WTF_CSRF_ENABLED"] = False
 
     with app.app_context():
         db.create_all()
