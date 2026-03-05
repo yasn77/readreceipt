@@ -22,7 +22,7 @@ types-requests==2.32.4.20260107
 types-flask==1.1.6
 
 # Pre-commit
-pre-commit==3.6.0
+pre-commit==3.8.0
 
 # Metrics (optional)
 prometheus-flask-exporter==0.23.2
