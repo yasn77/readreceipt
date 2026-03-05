@@ -119,10 +119,12 @@ csrf = CSRFProtect(app)
 
 # Configure CSRF settings for API-based authentication
 # We use header-based CSRF tokens for API endpoints
-app.config["WTF_CSRF_CHECK_DEFAULT"] = False  # We'll manually check where needed
+app.config["WTF_CSRF_CHECK_DEFAULT"] = True  # Enable CSRF by default
 app.config["WTF_CSRF_SSL_STRICT"] = True
 app.config["WTF_CSRF_TIME_LIMIT"] = 3600  # 1 hour token validity
 app.config["WTF_CSRF_SECRET_KEY"] = app.config["SECRET_KEY"]
+# Allow CSRF token via header for API endpoints
+app.config["WTF_CSRF_HEADERS"] = ["X-CSRFToken", "X-CSRF-Token"]
 
 # Rate limiting configuration
 limiter = Limiter(
@@ -575,27 +577,40 @@ def require_auth(view: Callable) -> Callable:
     SECURITY FIX #96: Implements session-based authentication with JWT tokens.
     Supports both JWT tokens (preferred) and legacy static tokens for backwards compatibility.
 
+    SECURITY FIX #101: Cookie-based authentication:
+    - Checks httpOnly auth cookie first
+    - Falls back to Authorization header for API clients
+
     Authentication flow:
-    1. Check for JWT token in Authorization header (Bearer <jwt_token>)
-    2. Validate JWT signature, expiration, and blacklist status
-    3. Fall back to legacy static token validation (deprecated)
-    4. Return 401 if authentication fails
+    1. Check for JWT token in httpOnly cookie (preferred)
+    2. Check for JWT token in Authorization header (Bearer <jwt_token>)
+    3. Validate JWT signature, expiration, and blacklist status
+    4. Fall back to legacy static token validation (deprecated)
+    5. Return 401 if authentication fails
 
     Returns 401 if authentication fails.
     """
 
     @wraps(view)
     def decorated_function(*args: Any, **kwargs: Any) -> Any:
-        auth_header = request.headers.get("Authorization")
-        if not auth_header:
-            logger.warning("Missing Authorization header")
-            return json.jsonify({"error": "Missing Authorization header"}), 401
+        token = None
 
-        # Support "Bearer <token>" format
-        if auth_header.startswith("Bearer "):
-            token = auth_header[7:]
-        else:
-            token = auth_header
+        # SECURITY FIX #101: Check cookie first (preferred method)
+        token = request.cookies.get("auth_token")
+
+        # Fall back to Authorization header if no cookie
+        if not token:
+            auth_header = request.headers.get("Authorization")
+            if auth_header:
+                # Support "Bearer <token>" format
+                if auth_header.startswith("Bearer "):
+                    token = auth_header[7:]
+                else:
+                    token = auth_header
+
+        if not token:
+            logger.warning("Missing authentication (cookie or Authorization header)")
+            return json.jsonify({"error": "Authentication required"}), 401
 
         # SECURITY FIX #96: Try JWT token validation first
         if token.startswith("eyJ"):  # JWT tokens start with 'eyJ'
@@ -745,6 +760,7 @@ def send_img(this_uuid: str) -> Any:
 
 @app.route("/api/admin/login", methods=["POST"])
 @limiter.limit("5 per minute")
+@csrf.exempt  # Exempt login from CSRF - it's token-based auth, no prior session
 def admin_login() -> Any:
     """Admin login endpoint with JWT token authentication.
 
@@ -754,6 +770,10 @@ def admin_login() -> Any:
     - Supports token refresh mechanism
     - Admin token is hashed, not stored in plain text
 
+    SECURITY FIX #101: Cookie-based authentication:
+    - Sets httpOnly, Secure, SameSite=Strict cookie
+    - Token not returned in response body (prevents XSS theft)
+
     Request:
         {
             "token": "admin-token"
@@ -762,10 +782,10 @@ def admin_login() -> Any:
     Response:
         {
             "status": "authenticated",
-            "token": "<jwt-token>",
             "expires_in": 86400,  # seconds
             "token_type": "Bearer"
         }
+        With httpOnly cookie set
     """
     data = request.get_json()
     if not data:
@@ -791,14 +811,27 @@ def admin_login() -> Any:
         logger.info("Admin login successful")
         # SECURITY FIX #96: Generate JWT token instead of returning static token
         jwt_token = generate_jwt_token(admin_token)
-        return json.jsonify(
-            {
-                "status": "authenticated",
-                "token": jwt_token,
-                "expires_in": JWT_TOKEN_EXPIRY_HOURS * 3600,
-                "token_type": "Bearer",
-            }
-        ), 200
+
+        # SECURITY FIX #101: Set httpOnly, Secure, SameSite=Strict cookie
+        response = make_response(
+            json.jsonify(
+                {
+                    "status": "authenticated",
+                    "expires_in": JWT_TOKEN_EXPIRY_HOURS * 3600,
+                    "token_type": "Bearer",
+                }
+            )
+        )
+        response.set_cookie(
+            "auth_token",
+            jwt_token,
+            httponly=True,
+            secure=True,  # Only over HTTPS
+            samesite="Strict",
+            max_age=JWT_TOKEN_EXPIRY_HOURS * 3600,  # 24 hours by default
+            path="/",
+        )
+        return response
 
     logger.warning("Admin login failed")
     return json.jsonify({"error": "Invalid token"}), 401
@@ -813,12 +846,16 @@ def refresh_token() -> Any:
     SECURITY FIX #96: Allows token refresh before expiration.
     Requires valid current token to get a new one.
 
+    SECURITY FIX #101: Cookie-based authentication:
+    - Sets new httpOnly, Secure, SameSite=Strict cookie
+    - Token not returned in response body
+
     Response:
         {
-            "token": "<new-jwt-token>",
             "expires_in": 86400,
             "token_type": "Bearer"
         }
+        With new httpOnly cookie set
     """
     admin_token = os.environ.get("ADMIN_TOKEN")
     if not admin_token:
@@ -828,13 +865,25 @@ def refresh_token() -> Any:
     jwt_token = generate_jwt_token(admin_token)
     logger.info("Token refreshed successfully")
 
-    return json.jsonify(
-        {
-            "token": jwt_token,
-            "expires_in": JWT_TOKEN_EXPIRY_HOURS * 3600,
-            "token_type": "Bearer",
-        }
-    ), 200
+    # SECURITY FIX #101: Set new httpOnly, Secure, SameSite=Strict cookie
+    response = make_response(
+        json.jsonify(
+            {
+                "expires_in": JWT_TOKEN_EXPIRY_HOURS * 3600,
+                "token_type": "Bearer",
+            }
+        )
+    )
+    response.set_cookie(
+        "auth_token",
+        jwt_token,
+        httponly=True,
+        secure=True,
+        samesite="Strict",
+        max_age=JWT_TOKEN_EXPIRY_HOURS * 3600,
+        path="/",
+    )
+    return response
 
 
 @app.route("/api/admin/logout", methods=["POST"])
@@ -846,16 +895,21 @@ def admin_logout() -> Any:
     SECURITY FIX #96: Implements token revocation mechanism.
     Adds token to blacklist to prevent further use.
 
+    SECURITY FIX #101: Cookie-based authentication:
+    - Clears httpOnly auth cookie on logout
+
     Note: In production, use Redis/database for distributed blacklist.
     """
-    auth_header = request.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header[7:]
-        if token.startswith("eyJ"):  # JWT token
-            revoke_jwt_token(token)
-            logger.info("Token revoked successfully")
+    # Get token from cookie for revocation
+    token = request.cookies.get("auth_token")
+    if token and token.startswith("eyJ"):  # JWT token
+        revoke_jwt_token(token)
+        logger.info("Token revoked successfully")
 
-    return json.jsonify({"status": "logged out"}), 200
+    # SECURITY FIX #101: Clear the auth cookie
+    response = make_response(json.jsonify({"status": "logged out"}))
+    response.delete_cookie("auth_token", path="/")
+    return response
 
 
 @app.route("/api/admin/recipients", methods=["GET"])
