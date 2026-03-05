@@ -94,16 +94,42 @@ Read Receipt provides:
 
 ## Quick Start
 
-Get up and running in minutes:
+Get up and running in minutes using mise and uv:
 
 ### Prerequisites
 
-- Python 3.11 or higher
+- [mise](https://mise.jdx.dev/) - Tool version manager
 - Node.js 18 or higher
 - PostgreSQL (optional, SQLite for development)
 - Chrome or Firefox browser (for extension)
 
-### Backend Setup
+### Quick Setup with mise
+
+```bash
+# Clone the repository
+git clone https://github.com/yasn77/readreceipt.git
+cd readreceipt
+
+# Install mise if you haven't already
+curl https://mise.run | sh
+
+# mise will automatically install Python, uv, and all tools
+mise install
+
+# Set environment variables
+export SQLALCHEMY_DATABASE_URI=sqlite:///db.sqlite3
+export ADMIN_TOKEN=your-secure-token-here
+
+# Install dependencies with uv
+mise run install
+
+# Run the application
+mise run dev
+```
+
+The server will start on `http://localhost:5000` with automatic virtual environment activation.
+
+### Alternative: Manual Setup (without mise)
 
 ```bash
 # Clone the repository
@@ -114,18 +140,19 @@ cd readreceipt
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
+# Install uv package manager
+pip install uv
+
 # Install dependencies
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 
 # Set environment variables
 export SQLALCHEMY_DATABASE_URI=sqlite:///db.sqlite3
 export ADMIN_TOKEN=your-secure-token-here
 
-# Initialise database and run the application
+# Run the application
 python app.py
 ```
-
-The server will start on `http://localhost:5000`.
 
 ### Admin Dashboard Setup
 
@@ -215,6 +242,47 @@ helm install readreceipt ./helm/readreceipt \
 ```
 
 See [Deployment Guide](docs/deployment.md) for production deployment instructions.
+
+## Development Tasks
+
+This project uses mise for task management. Available tasks:
+
+```bash
+# Install all dependencies
+mise run install
+
+# Run the application
+mise run dev
+
+# Run tests
+mise run test
+
+# Run tests with coverage
+mise run test-cov
+
+# Lint code
+mise run lint
+
+# Format code
+mise run format
+
+# Type check
+mise run typecheck
+
+# Run pre-commit hooks
+mise run precommit
+
+# Clean build artifacts
+mise run clean
+
+# Show project info
+mise run info
+
+# Serve documentation
+mise run docs
+```
+
+See `.mise.toml` for the complete list of available tasks.
 
 ## Configuration
 

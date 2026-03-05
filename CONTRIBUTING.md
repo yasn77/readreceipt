@@ -47,23 +47,39 @@ git clone https://github.com/yasn77/readreceipt.git
 cd readreceipt
 ```
 
-### 2. Set Up Python Environment
+### 2. Set Up Python Environment with mise
 
-We use `mise` for environment management:
+We use `mise` for environment and tool management:
 
 ```bash
-# Install mise
+# Install mise (if not already installed)
 curl https://mise.run | sh
 
-# Install Python
-mise use python@3.11
+# Install Python, uv, and all development tools
+mise install
+
+# This will:
+# - Install Python 3.11
+# - Install uv package manager
+# - Install ruff, black, mypy, pytest, pre-commit
+# - Create and activate virtual environment automatically
+```
+
+The virtual environment will be automatically created in `.venv/` and activated when you enter the project directory (if you have direnv installed).
+
+### Alternative: Manual Setup (without mise)
+
+```bash
+# Install Python 3.11+
+# Install uv package manager
+pip install uv
 
 # Create virtual environment
 python -m venv venv
 source venv/bin/activate
 
 # Install dependencies
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
 ### 3. Set Up Node.js Environment
@@ -80,8 +96,40 @@ npm install
 ### 4. Install Pre-commit Hooks
 
 ```bash
-pip install pre-commit
+mise run precommit
+# or manually:
 pre-commit install
+```
+
+### Useful mise Commands
+
+```bash
+# Install dependencies
+mise run install
+
+# Run tests
+mise run test
+
+# Run tests with coverage
+mise run test-cov
+
+# Lint code
+mise run lint
+
+# Format code
+mise run format
+
+# Type check
+mise run typecheck
+
+# Run the application
+mise run dev
+
+# Clean build artifacts
+mise run clean
+
+# See all available tasks
+mise run
 ```
 
 ## Code Style
