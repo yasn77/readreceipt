@@ -40,5 +40,8 @@
       "resources": ["content.js"],
       "matches": ["https://mail.google.com/*"]
     }
-  ]
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self'; img-src 'self' data: https:; connect-src 'self' https://mail.google.com"
+  }
 }

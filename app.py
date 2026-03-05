@@ -30,7 +30,7 @@ from prometheus_flask_exporter import PrometheusMetrics
 from sqlalchemy_utils import CountryType, IPAddressType
 from ua_parser import user_agent_parser
 
-from utils.logging import configure_logging, init_logging_middleware
+from utils.logging import configure_logging, get_logger, init_logging_middleware
 from utils.retry import retry_with_backoff
 
 app = Flask(__name__)
@@ -78,7 +78,7 @@ limiter = Limiter(
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Prometheus metrics setup
 metrics = PrometheusMetrics(
@@ -477,15 +477,41 @@ def get_recipients() -> Any:
 def create_recipient() -> Any:
     """Create a new recipient."""
     data = request.get_json()
+    if not data:
+        logger.warning("Create recipient failed: invalid JSON")
+        return json.jsonify({"error": "Invalid JSON"}), 400
 
-    if not data.get("email"):
-        logger.warning("Create recipient failed: missing email")
+    # Input validation - email is required and must be valid format
+    email = data.get("email", "")
+    if not email or not isinstance(email, str):
+        logger.warning("Create recipient failed: missing or invalid email")
         return json.jsonify({"error": "Email is required"}), 400
+
+    # Email length limit
+    if len(email) > 254:
+        logger.warning("Create recipient failed: email too long")
+        return json.jsonify({"error": "Email too long"}), 400
+
+    # Basic email format validation
+    email_pattern = r"^[\w\.\-]+@[a-zA-Z\.\-]+\.[a-zA-Z]{2,}$"
+    cleaned_email = bleach.clean(email, tags=[], strip=True)
+    if not re.match(email_pattern, cleaned_email):
+        logger.warning("Create recipient failed: invalid email format")
+        return json.jsonify({"error": "Invalid email format"}), 400
+
+    description = data.get("description", "")
+    if description and (not isinstance(description, str) or len(description) > 200):
+        logger.warning("Create recipient failed: invalid description")
+        return json.jsonify({"error": "Description must be string and max 200 chars"}), 400
+
+    # Sanitise inputs
+    email = cleaned_email
+    description = bleach.clean(description, tags=[], strip=True) if description else ""
 
     recipient = Recipients(
         r_uuid=str(uuid.uuid4()),
-        description=data.get("description", ""),
-        email=data["email"],
+        description=description,
+        email=email,
     )
     db.session.add(recipient)
     commit_with_retry(
@@ -496,9 +522,11 @@ def create_recipient() -> Any:
 
     logger.info(
         "Recipient created",
-        recipient_id=recipient.id,
-        recipient_uuid=recipient.r_uuid,
-        email=recipient.email,
+        extra={
+            "recipient_id": recipient.id,
+            "recipient_uuid": recipient.r_uuid,
+            "email": recipient.email,
+        },
     )
 
     return (
@@ -578,8 +606,10 @@ def delete_recipient(recipient_id: int) -> Any:
 
     logger.info(
         "Recipient deleted",
-        recipient_id=recipient.id,
-        recipient_uuid=recipient.r_uuid,
+        extra={
+            "recipient_id": recipient.id,
+            "recipient_uuid": recipient.r_uuid,
+        },
     )
 
     return json.jsonify({"status": "deleted"}), 200
