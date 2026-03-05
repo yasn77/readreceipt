@@ -129,3 +129,4 @@ dmypy.json
 .pyre/
 
 .direnv
+admin-dashboard/node_modules/

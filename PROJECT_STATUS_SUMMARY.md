@@ -1,6 +1,6 @@
 # Project Status Summary
 
-**Date:** 4 March 2026  
+**Date:** 4 March 2026
 **Project:** ReadReceipt Improvement Initiative
 
 ---
@@ -152,5 +152,5 @@ All workstreams can proceed independently.
 
 ---
 
-**Prepared by:** Project Coordinator  
+**Prepared by:** Project Coordinator
 **Last Updated:** 4 March 2026

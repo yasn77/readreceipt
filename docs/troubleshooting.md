@@ -66,10 +66,10 @@ export PORT=5001
    ```bash
    # Find process using port 5000
    lsof -i :5000
-   
+
    # Kill the process
    kill -9 <PID>
-   
+
    # Or use different port
    export PORT=5001
    python app.py
@@ -79,10 +79,10 @@ export PORT=5001
    ```bash
    # Check database URI
    echo $SQLALCHEMY_DATABASE_URI
-   
+
    # Test PostgreSQL connection
    psql -h hostname -U username -d readreceipt
-   
+
    # For SQLite, check permissions
    ls -la db.sqlite3
    chmod 644 db.sqlite3
@@ -92,7 +92,7 @@ export PORT=5001
    ```bash
    # Check Python version (must be 3.11+)
    python --version
-   
+
    # Reinstall problematic package
    pip uninstall flask
    pip install flask
@@ -165,7 +165,7 @@ export PORT=5001
    ```bash
    # View Flask logs
    journalctl -u readreceipt -f
-   
+
    # Or check application logs
    tail -f /path/to/logs/app.log
    ```
@@ -415,8 +415,8 @@ export PORT=5001
 1. **Server-Side Fix:**
    ```python
    from flask_cors import CORS
-   
-   CORS(app, 
+
+   CORS(app,
         origins=[
             'https://mail.google.com',
             'https://outlook.live.com'

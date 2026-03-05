@@ -54,15 +54,15 @@ if (browser === 'chrome') {
     if (manifest.manifest_version !== 3) {
         errors.push('Chrome extension must use manifest_version 3');
     }
-    
+
     if (!manifest.background?.service_worker) {
         errors.push('Chrome extension must have a background.service_worker');
     }
-    
+
     if (!manifest.action) {
         errors.push('Chrome extension must have an "action" field for the popup');
     }
-    
+
     if (manifest.browser_action) {
         errors.push('Chrome extension should not use "browser_action" (use "action" instead)');
     }
@@ -70,15 +70,15 @@ if (browser === 'chrome') {
     if (manifest.manifest_version !== 2) {
         errors.push('Firefox extension must use manifest_version 2');
     }
-    
+
     if (!manifest.background?.scripts) {
         errors.push('Firefox extension must have background.scripts array');
     }
-    
+
     if (!manifest.browser_action) {
         errors.push('Firefox extension must have a "browser_action" field');
     }
-    
+
     if (!manifest.applications?.gecko) {
         warnings.push('Firefox extension should have applications.gecko for extension ID');
     }

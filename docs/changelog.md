@@ -214,8 +214,8 @@ For questions or issues:
 
 ---
 
-**Latest Version:** 0.2.0  
-**Release Date:** January 15, 2024  
+**Latest Version:** 0.2.0
+**Release Date:** January 15, 2024
 **Next Release:** TBD
 
 For the most up-to-date information, check the [GitHub Releases](https://github.com/yasn77/readreceipt/releases) page.

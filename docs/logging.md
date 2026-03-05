@@ -217,7 +217,7 @@ def admin_login():
     if token == admin_token:
         logger.info("Admin login successful")
         return json.jsonify({"status": "authenticated"}), 200
-    
+
     logger.warning("Admin login failed")
     return json.jsonify({"error": "Invalid token"}), 401
 ```
@@ -242,7 +242,7 @@ filter {
       match => ["timestamp", "ISO8601"]
       target => "@timestamp"
     }
-    
+
     mutate {
       add_field => { "[@metadata][service]" => "readreceipt" }
     }

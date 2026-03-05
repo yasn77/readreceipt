@@ -133,8 +133,8 @@ sum by (endpoint) (rate(readreceipt_http_requests_total[1m])) * 60
 sum by (endpoint) (rate(readreceipt_http_requests_total{status=~"5.."}[5m]))
 
 # Error percentage
-sum(rate(readreceipt_http_requests_total{status=~"5.."}[5m])) 
-/ 
+sum(rate(readreceipt_http_requests_total{status=~"5.."}[5m]))
+/
 sum(rate(readreceipt_http_requests_total[5m])) * 100
 ```
 
@@ -142,17 +142,17 @@ sum(rate(readreceipt_http_requests_total[5m])) * 100
 
 ```promql
 # Average request duration
-rate(readreceipt_http_request_duration_seconds_sum[5m]) 
-/ 
+rate(readreceipt_http_request_duration_seconds_sum[5m])
+/
 rate(readreceipt_http_request_duration_seconds_count[5m])
 
 # 95th percentile latency
-histogram_quantile(0.95, 
+histogram_quantile(0.95,
   sum(rate(readreceipt_http_request_duration_seconds_bucket[5m])) by (le)
 )
 
 # 99th percentile latency
-histogram_quantile(0.99, 
+histogram_quantile(0.99,
   sum(rate(readreceipt_http_request_duration_seconds_bucket[5m])) by (le)
 )
 ```
@@ -173,8 +173,8 @@ tracking_events_unique_recipients
 recipients_total
 
 # Average processing time
-rate(tracking_event_processing_seconds_sum[5m]) 
-/ 
+rate(tracking_event_processing_seconds_sum[5m])
+/
 rate(tracking_event_processing_seconds_count[5m])
 ```
 
@@ -189,8 +189,8 @@ groups:
       # High error rate
       - alert: HighErrorRate
         expr: |
-          sum(rate(readreceipt_http_requests_total{status=~"5.."}[5m])) 
-          / 
+          sum(rate(readreceipt_http_requests_total{status=~"5.."}[5m]))
+          /
           sum(rate(readreceipt_http_requests_total[5m])) > 0.05
         for: 5m
         labels:
@@ -202,7 +202,7 @@ groups:
       # High latency
       - alert: HighLatency
         expr: |
-          histogram_quantile(0.95, 
+          histogram_quantile(0.95,
             sum(rate(readreceipt_http_request_duration_seconds_bucket[5m])) by (le)
           ) > 1
         for: 5m

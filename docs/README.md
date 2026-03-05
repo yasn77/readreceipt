@@ -162,5 +162,5 @@ For questions about documentation:
 
 ---
 
-**Last Updated:** 2024-01-15  
+**Last Updated:** 2024-01-15
 **Maintained By:** Read Receipt Team

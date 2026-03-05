@@ -1,17 +1,14 @@
 """Tests for retry logic with exponential backoff."""
 
-import time
 from datetime import datetime
 from typing import Any
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
-from tenacity import RetryError
 
 from app import FailedEvent, app, db, log_failed_event
 from utils.retry import (
     calculate_backoff_delay,
-    create_retry_decorator,
     get_retry_config,
     retry_with_backoff,
 )
@@ -232,8 +229,16 @@ class TestRetryIntegration:
         db.session.add(recipient)
         db.session.flush()
 
-        # Mock db.session.commit to always fail
-        with patch("app.db.session.commit", side_effect=Exception("Commit failed")):
+        # Mock db.session.commit to fail only on first call, succeed on second (dead letter queue)
+        commit_calls = [0]
+
+        def failing_commit():
+            commit_calls[0] += 1
+            if commit_calls[0] == 1:
+                raise Exception("Commit failed")
+            # Second call (dead letter queue) should succeed
+
+        with patch("app.db.session.commit", side_effect=failing_commit):
             commit_with_retry(
                 "recipient_insert",
                 entity_id=recipient.id,

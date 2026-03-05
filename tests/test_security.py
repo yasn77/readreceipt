@@ -1,11 +1,10 @@
 """Security tests for the Read Receipt application."""
 
-import os
 from typing import Any
 
 import pytest
 
-from app import Recipients, app, db
+from app import app, db
 
 
 @pytest.fixture
@@ -86,7 +85,6 @@ class TestCORSConfiguration:
         """Test CORS allows correct methods."""
         # Flask-CORS doesn't add headers in testing mode by default
         # This test verifies CORS is configured, not that headers are present
-        from flask_cors import CORS
 
         assert hasattr(app, "cors") or True  # CORS is configured in app.py
 

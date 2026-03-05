@@ -171,7 +171,7 @@ from app import app, db
 def client():
     app.config['TESTING'] = True
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
-    
+
     with app.test_client() as client:
         with app.app_context():
             db.create_all()
@@ -290,20 +290,20 @@ def create_recipient(
     description: str = ""
 ) -> dict[str, Any]:
     """Create a new recipient in the database.
-    
+
     Args:
         email: Recipient email address
         description: Optional description
-        
+
     Returns:
         Dictionary with recipient details
-        
+
     Raises:
         ValueError: If email is invalid
     """
     if not email:
         raise ValueError("Email is required")
-    
+
     # Implementation
     return {"email": email, "description": description}
 ```

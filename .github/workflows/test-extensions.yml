@@ -83,23 +83,23 @@ jobs:
           test -f extensions/chrome/background.js
           test -f extensions/chrome/content.js
           test -f extensions/chrome/popup.html
-          
+
           echo "Checking Firefox extension files..."
           test -f extensions/firefox/manifest.json
           test -f extensions/firefox/background.js
           test -f extensions/firefox/content.js
           test -f extensions/firefox/popup.html
-          
+
           echo "All required files present"
 
       - name: Verify manifest versions
         run: |
           CHROME_VERSION=$(node -p "require('./extensions/chrome/manifest.json').version")
           FIREFOX_VERSION=$(node -p "require('./extensions/firefox/manifest.json').version")
-          
+
           echo "Chrome version: $CHROME_VERSION"
           echo "Firefox version: $FIREFOX_VERSION"
-          
+
           if [ "$CHROME_VERSION" != "$FIREFOX_VERSION" ]; then
             echo "Warning: Version mismatch between Chrome and Firefox extensions"
           fi

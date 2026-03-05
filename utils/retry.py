@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import logging
 import random
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
 from tenacity import (
     after_log,

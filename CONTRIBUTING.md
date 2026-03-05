@@ -331,5 +331,5 @@ Your contributions make Read Receipt better for everyone. We appreciate your tim
 
 ---
 
-**Last Updated:** 2024-01-15  
+**Last Updated:** 2024-01-15
 **License:** MIT

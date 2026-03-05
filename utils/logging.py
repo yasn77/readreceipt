@@ -6,13 +6,12 @@ sensitive data redaction, and performance monitoring capabilities.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import re
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from functools import wraps
 from typing import Any
 
@@ -112,7 +111,7 @@ def get_log_context() -> dict[str, Any]:
         Dictionary containing standard logging fields.
     """
     return {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "request_id": get_request_id(),
         "logging_module": __name__,
         "logging_function": None,  # Will be set by logger

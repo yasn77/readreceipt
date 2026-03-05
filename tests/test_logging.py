@@ -1,14 +1,12 @@
 """Tests for structured logging functionality."""
 
-import json
 import logging
-import os
 from collections.abc import Generator
 from typing import Any
 
 import pytest
 
-from app import Recipients, Tracking, app, db
+from app import Recipients, app, db
 from utils.logging import (
     RedactingJsonFormatter,
     configure_logging,
