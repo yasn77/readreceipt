@@ -8,6 +8,11 @@ gunicorn==25.1.0
 psycopg2==2.9.11
 ua-parser==1.0.1
 
+# Security dependencies
+flask-cors==4.0.0
+flask-limiter==3.5.0
+bleach==6.1.0
+
 # Testing
 pytest==8.0.0
 pytest-cov==4.1.0
@@ -26,3 +31,9 @@ pre-commit==3.6.0
 
 # Metrics (optional)
 prometheus-flask-exporter==0.23.0
+
+# Retry logic
+tenacity==8.2.3
+
+# Logging
+python-json-logger==2.0.7
