@@ -1,22 +1,24 @@
-[settings]
-# Use uv to create and manage virtual environments
-python.uv_venv_auto = "create|source"
-
 [env]
 # Project configuration
 PROJECT_NAME = "readreceipt"
 PYTHON_VERSION = "3.11"
 
+# Automatic virtualenv creation with uv
+# This tells mise to create .venv using uv if it doesn't exist
+_.python.venv = { path = ".venv", create = true, uv_create_args = ["--seed"] }
+
 # Application environment variables
-ADMIN_TOKEN = "{{ env.ADMIN_TOKEN | default='change-me-in-production' }}"
-SQLALCHEMY_DATABASE_URI = "{{ env.SQLALCHEMY_DATABASE_URI | default='sqlite:///db.sqlite3' }}"
-FLASK_ENV = "{{ env.FLASK_ENV | default='development' }}"
-FLASK_DEBUG = "{{ env.FLASK_DEBUG | default='1' }}"
-PORT = "{{ env.PORT | default='5000' }}"
-LOG_LEVEL = "{{ env.LOG_LEVEL | default='INFO' }}"
+# Tera template syntax: {{ env.VAR | default(value='default') }}
+# Override these by setting them in your shell or creating a .env file
+ADMIN_TOKEN = "{{ env.ADMIN_TOKEN | default(value='change-me-in-production') }}"
+SQLALCHEMY_DATABASE_URI = "{{ env.SQLALCHEMY_DATABASE_URI | default(value='sqlite:///db.sqlite3') }}"
+FLASK_ENV = "{{ env.FLASK_ENV | default(value='development') }}"
+FLASK_DEBUG = "{{ env.FLASK_DEBUG | default(value='1') }}"
+PORT = "{{ env.PORT | default(value='5000') }}"
+LOG_LEVEL = "{{ env.LOG_LEVEL | default(value='INFO') }}"
 
 # Extension configuration
-EXTENSION_ALLOWED_ORIGINS = "{{ env.EXTENSION_ALLOWED_ORIGINS | default='https://mail.google.com' }}"
+EXTENSION_ALLOWED_ORIGINS = "{{ env.EXTENSION_ALLOWED_ORIGINS | default(value='https://mail.google.com') }}"
 
 [tools]
 # Python version
@@ -25,19 +27,15 @@ python = "3.11"
 # Package manager
 uv = "latest"
 
-# Linting and formatting
+# Linting and formatting (available as standalone tools)
 ruff = "latest"
 black = "latest"
 
-# Type checking
-mypy = "latest"
-
-# Testing
-pytest = "latest"
-pytest-cov = "latest"
-
-# Pre-commit
+# Pre-commit (available as standalone tool)
 pre-commit = "latest"
+
+# Note: mypy, pytest, pytest-cov are installed via uv in the virtual environment
+# They are Python packages, not standalone tools
 
 [tasks]
 # Installation tasks
