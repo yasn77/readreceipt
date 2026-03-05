@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { adminApi } from '../api/api'
+import { adminApi, setStoredToken } from '../api/api'
 
 function Login({ onLogin }) {
   const [token, setToken] = useState('')
@@ -15,9 +15,7 @@ function Login({ onLogin }) {
 
     try {
       await adminApi.login(token)
-      // NOTE: Token stored in localStorage is vulnerable to XSS attacks.
-      // In production, use HttpOnly cookies for secure token storage.
-      localStorage.setItem('adminToken', token)
+      setStoredToken(token)
       onLogin()
       navigate('/')
     } catch (err) {

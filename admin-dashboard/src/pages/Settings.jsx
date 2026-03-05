@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { adminApi } from '../api/api'
+import { useNavigate } from 'react-router-dom'
+import { adminApi, clearAuth } from '../api/api'
 
 function Settings() {
   const [settings, setSettings] = useState({
@@ -10,6 +11,7 @@ function Settings() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const navigate = useNavigate()
 
   useEffect(() => {
     loadSettings()
@@ -41,6 +43,11 @@ function Settings() {
     }
   }
 
+  const handleLogout = () => {
+    clearAuth()
+    navigate('/login')
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>
   }
@@ -54,6 +61,14 @@ function Settings() {
               <div className="flex-shrink-0 flex items-center">
                 <h1 className="text-xl font-bold">Read Receipt</h1>
               </div>
+            </div>
+            <div className="flex items-center">
+              <button
+                onClick={handleLogout}
+                className="ml-4 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-800 focus:outline-none"
+              >
+                Logout
+              </button>
             </div>
           </div>
         </div>

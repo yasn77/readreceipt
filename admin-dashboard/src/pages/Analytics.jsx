@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { analyticsApi } from '../api/api'
+import { useNavigate } from 'react-router-dom'
+import { analyticsApi, clearAuth } from '../api/api'
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 function Analytics() {
@@ -7,6 +8,7 @@ function Analytics() {
   const [events, setEvents] = useState([])
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
 
   useEffect(() => {
     loadData()
@@ -29,6 +31,11 @@ function Analytics() {
     }
   }
 
+  const handleLogout = () => {
+    clearAuth()
+    navigate('/login')
+  }
+
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8']
 
   if (loading) {
@@ -44,6 +51,14 @@ function Analytics() {
               <div className="flex-shrink-0 flex items-center">
                 <h1 className="text-xl font-bold">Read Receipt</h1>
               </div>
+            </div>
+            <div className="flex items-center">
+              <button
+                onClick={handleLogout}
+                className="ml-4 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-800 focus:outline-none"
+              >
+                Logout
+              </button>
             </div>
           </div>
         </div>

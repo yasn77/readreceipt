@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { adminApi } from '../api/api'
+import { Link, useNavigate } from 'react-router-dom'
+import { adminApi, clearAuth } from '../api/api'
 
 function Dashboard() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
 
   useEffect(() => {
     loadStats()
@@ -19,6 +20,11 @@ function Dashboard() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleLogout = () => {
+    clearAuth()
+    navigate('/login')
   }
 
   if (loading) {
@@ -64,6 +70,14 @@ function Dashboard() {
                   Settings
                 </Link>
               </div>
+            </div>
+            <div className="flex items-center">
+              <button
+                onClick={handleLogout}
+                className="ml-4 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-800 focus:outline-none"
+              >
+                Logout
+              </button>
             </div>
           </div>
         </div>

@@ -9,8 +9,38 @@ const api = axios.create({
   }
 })
 
+const TOKEN_STORAGE_KEY = 'adminToken'
+const TOKEN_EXPIRY_KEY = 'adminTokenExpiry'
+const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000
+
+const getStoredToken = () => {
+  const token = localStorage.getItem(TOKEN_STORAGE_KEY)
+  const expiry = localStorage.getItem(TOKEN_EXPIRY_KEY)
+
+  if (!token || !expiry) {
+    return null
+  }
+
+  if (Date.now() > parseInt(expiry)) {
+    clearAuth()
+    return null
+  }
+
+  return token
+}
+
+const setStoredToken = (token) => {
+  localStorage.setItem(TOKEN_STORAGE_KEY, token)
+  localStorage.setItem(TOKEN_EXPIRY_KEY, Date.now() + TOKEN_EXPIRY_MS)
+}
+
+const clearAuth = () => {
+  localStorage.removeItem(TOKEN_STORAGE_KEY)
+  localStorage.removeItem(TOKEN_EXPIRY_KEY)
+}
+
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('adminToken')
+  const token = getStoredToken()
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -21,7 +51,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('adminToken')
+      clearAuth()
       window.location.href = '/login'
     }
     return Promise.reject(error)
@@ -36,7 +66,8 @@ export const adminApi = {
   deleteRecipient: (id) => api.delete(`/admin/recipients/${id}`),
   getStats: () => api.get('/admin/stats'),
   getSettings: () => api.get('/admin/settings'),
-  updateSettings: (data) => api.put('/admin/settings', data)
+  updateSettings: (data) => api.put('/admin/settings', data),
+  logout: () => clearAuth()
 }
 
 export const analyticsApi = {
@@ -48,4 +79,5 @@ export const analyticsApi = {
   export: () => api.get('/analytics/export')
 }
 
+export { getStoredToken, setStoredToken, clearAuth }
 export default api

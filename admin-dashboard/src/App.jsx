@@ -5,12 +5,13 @@ import Dashboard from './pages/Dashboard'
 import Recipients from './pages/Recipients'
 import Settings from './pages/Settings'
 import Analytics from './pages/Analytics'
+import { getStoredToken } from './api/api'
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   useEffect(() => {
-    const token = localStorage.getItem('adminToken')
+    const token = getStoredToken()
     setIsAuthenticated(!!token)
   }, [])
 
