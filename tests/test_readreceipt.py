@@ -18,7 +18,10 @@ def client() -> Generator[Any, None, None]:
 
     with app.app_context():
         db.create_all()
-        yield app.test_client()
+        test_client = app.test_client()
+        # Add auth header for admin/analytics endpoints
+        test_client.environ_base["HTTP_AUTHORIZATION"] = "Bearer test-token"
+        yield test_client
         db.session.remove()
         db.drop_all()
 

@@ -18,7 +18,9 @@ def client() -> Any:
 
     with app.app_context():
         db.create_all()
-        yield app.test_client()
+        test_client = app.test_client()
+        test_client.environ_base["HTTP_AUTHORIZATION"] = "Bearer test-token"
+        yield test_client
         db.session.remove()
         db.drop_all()
 
@@ -85,7 +87,8 @@ class TestCORSConfiguration:
         # Flask-CORS doesn't add headers in testing mode by default
         # This test verifies CORS is configured, not that headers are present
         from flask_cors import CORS
-        assert hasattr(app, 'cors') or True  # CORS is configured in app.py
+
+        assert hasattr(app, "cors") or True  # CORS is configured in app.py
 
 
 class TestRateLimiting:
