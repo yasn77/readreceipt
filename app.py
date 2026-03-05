@@ -132,6 +132,7 @@ limiter = Limiter(
     app=app,
     default_limits=["120 per minute"],
     storage_uri="memory://",
+    enabled=os.environ.get("FLASK_RATELIMIT_ENABLED", "true").lower() == "true",
 )
 
 db = SQLAlchemy(app)
