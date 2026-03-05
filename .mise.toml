@@ -1,10 +1,22 @@
-[env]
-# Automatic virtualenv activation with uv
-_.python.venv = { path = ".venv", create = true, uv_create_args = ["--seed"] }
+[settings]
+# Use uv to create and manage virtual environments
+python.uv_venv_auto = "create|source"
 
+[env]
 # Project configuration
 PROJECT_NAME = "readreceipt"
 PYTHON_VERSION = "3.11"
+
+# Application environment variables
+ADMIN_TOKEN = "{{ env.ADMIN_TOKEN | default='change-me-in-production' }}"
+SQLALCHEMY_DATABASE_URI = "{{ env.SQLALCHEMY_DATABASE_URI | default='sqlite:///db.sqlite3' }}"
+FLASK_ENV = "{{ env.FLASK_ENV | default='development' }}"
+FLASK_DEBUG = "{{ env.FLASK_DEBUG | default='1' }}"
+PORT = "{{ env.PORT | default='5000' }}"
+LOG_LEVEL = "{{ env.LOG_LEVEL | default='INFO' }}"
+
+# Extension configuration
+EXTENSION_ALLOWED_ORIGINS = "{{ env.EXTENSION_ALLOWED_ORIGINS | default='https://mail.google.com' }}"
 
 [tools]
 # Python version
@@ -35,7 +47,7 @@ alias = "i"
 run = "uv pip install -r requirements.txt"
 
 [tasks.install-dev]
-description = "Install development dependencies"
+description = "Install development dependencies and pre-commit hooks"
 run = "uv pip install -r requirements.txt && pre-commit install"
 
 # Running tasks
@@ -45,8 +57,8 @@ alias = "start"
 run = "python app.py"
 
 [tasks.dev]
-description = "Run Flask in development mode"
-run = "FLASK_ENV=development FLASK_DEBUG=1 python app.py"
+description = "Run Flask in development mode with auto-reload"
+run = "flask --app app.py run --debug --host=0.0.0.0 --port={{ env.PORT | default='5000' }}"
 
 # Testing tasks
 [tasks.test]
@@ -61,7 +73,7 @@ run = "pytest tests/ --cov=app --cov-report=term-missing"
 
 [tasks.test-html]
 description = "Run tests with HTML coverage report"
-run = "pytest tests/ --cov=app --cov-report=html && open htmlcov/index.html"
+run = "pytest tests/ --cov=app --cov-report=html"
 
 # Linting tasks
 [tasks.lint]
@@ -85,7 +97,7 @@ run = "mypy . --ignore-missing-imports"
 
 # Pre-commit tasks
 [tasks.precommit]
-description = "Run pre-commit hooks"
+description = "Run pre-commit hooks on all files"
 run = "pre-commit run --all-files"
 
 # Utility tasks
@@ -116,6 +128,11 @@ echo "Python Version: $(python --version)"
 echo "Virtual Environment: ${VIRTUAL_ENV:-Not activated}"
 echo "UV Version: $(uv --version 2>&1 | head -1)"
 echo ""
+echo "Environment:"
+echo "  ADMIN_TOKEN: ${ADMIN_TOKEN:-not set}"
+echo "  SQLALCHEMY_DATABASE_URI: ${SQLALCHEMY_DATABASE_URI:-not set}"
+echo "  FLASK_ENV: ${FLASK_ENV:-not set}"
+echo ""
 echo "Available tasks:"
 mise task list --all
 """
@@ -127,3 +144,8 @@ run = "mkdocs serve"
 [tasks.build-docs]
 description = "Build documentation"
 run = "mkdocs build"
+
+[tasks.shell]
+description = "Spawn a shell with the project environment activated"
+alias = "sh"
+run = "exec $SHELL"

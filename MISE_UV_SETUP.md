@@ -105,48 +105,49 @@ mise run build-docs       # Build documentation
 
 ### .mise.toml
 
-The `.mise.toml` file configures:
+The `.mise.toml` file configures everything:
 
 ```toml
+[settings]
+# Use uv to create and manage virtual environments
+python.uv_venv_auto = "create|source"
+
 [env]
-# Automatic virtualenv creation with uv
-_.python.venv = { path = ".venv", create = true, uv_create_args = ["--seed"] }
+# Project configuration
+PROJECT_NAME = "readreceipt"
+
+# All environment variables managed by mise
+ADMIN_TOKEN = "{{ env.ADMIN_TOKEN | default='change-me-in-production' }}"
+SQLALCHEMY_DATABASE_URI = "{{ env.SQLALCHEMY_DATABASE_URI | default='sqlite:///db.sqlite3' }}"
+FLASK_ENV = "{{ env.FLASK_ENV | default='development' }}"
 
 [tools]
 python = "3.11"    # Python version
 uv = "latest"      # Package manager
 ruff = "latest"    # Linter
 black = "latest"   # Formatter
-mypy = "latest"    # Type checker
-pytest = "latest"  # Testing
-pre-commit = "latest"  # Git hooks
 ```
 
-### .envrc
+**Key features:**
+- `python.uv_venv_auto = "create|source"` - Automatically creates `.venv` with uv if missing
+- Environment variables use template syntax with defaults
+- Override any env var by setting it in your shell before running mise commands
 
-The `.envrc` file integrates with direnv for automatic environment activation:
+### Environment Variables
+
+All environment variables are managed by mise in `.mise.toml`. You can override them by setting them in your shell or creating a `.env` file:
 
 ```bash
-use mise
+# Set in shell
+export ADMIN_TOKEN=your-secure-token
+export SQLALCHEMY_DATABASE_URI=postgresql://user:pass@localhost:5432/readreceipt
 
-# Activate virtual environment if it exists
-if [ -d ".venv" ]; then
-  source .venv/bin/activate
-fi
+# Or create a .env file (not committed to git)
+echo "ADMIN_TOKEN=your-secure-token" >> .env
+echo "SQLALCHEMY_DATABASE_URI=postgresql://user:pass@localhost:5432/readreceipt" >> .env
 ```
 
-To enable direnv auto-activation:
-```bash
-# Install direnv
-curl -sfL https://direnv.net/install.sh | bash
-
-# Enable for your shell
-echo 'eval "$(direnv hook bash)"' >> ~/.bashrc  # or ~/.zshrc
-source ~/.bashrc
-
-# Allow the project's .envrc
-direnv allow
-```
+Mise will automatically load these when you run `mise run` commands.
 
 ## Using uv Directly
 
@@ -226,14 +227,16 @@ source ~/.bashrc
 ```
 
 ### Virtual environment not activating
-Check that direnv is installed and allowed:
+Mise automatically activates the venv when you run `mise run` commands. To verify:
 ```bash
-direnv allow
+mise run info
+# Should show: Virtual Environment: /path/to/readreceipt/.venv
 ```
 
-Or manually activate:
+Or manually check:
 ```bash
-source .venv/bin/activate
+which python
+# Should point to: /path/to/readreceipt/.venv/bin/python
 ```
 
 ### Tool versions not matching
@@ -247,6 +250,26 @@ Clear uv cache and retry:
 ```bash
 uv cache clean
 mise run install
+```
+
+### Environment variables not set
+Override defaults by setting them before running mise:
+```bash
+export ADMIN_TOKEN=my-token
+mise run dev
+```
+
+Or create a `.env` file in the project root:
+```bash
+ADMIN_TOKEN=my-token
+SQLALCHEMY_DATABASE_URI=sqlite:///db.sqlite3
+```
+
+### Venv not created by uv
+Force recreation:
+```bash
+mise run clean-venv
+mise install
 ```
 
 ## Benefits
