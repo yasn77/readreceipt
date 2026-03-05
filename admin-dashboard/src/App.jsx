@@ -5,15 +5,39 @@ import Dashboard from './pages/Dashboard'
 import Recipients from './pages/Recipients'
 import Settings from './pages/Settings'
 import Analytics from './pages/Analytics'
-import { getStoredToken } from './api/api'
+import api from './api/api'
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const token = getStoredToken()
-    setIsAuthenticated(!!token)
+    // SECURITY FIX #101: Cookie-based authentication
+    // Check authentication status by making a test request
+    // The browser will automatically send cookies
+    const checkAuth = async () => {
+      try {
+        // Try to fetch stats - if cookie is valid, will succeed
+        await api.get('/admin/stats')
+        setIsAuthenticated(true)
+      } catch (error) {
+        // 401 means not authenticated
+        setIsAuthenticated(false)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    checkAuth()
   }, [])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-xl">Loading...</div>
+      </div>
+    )
+  }
 
   return (
     <Routes>

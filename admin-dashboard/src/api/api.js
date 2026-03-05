@@ -2,50 +2,57 @@ import axios from 'axios'
 
 const API_BASE_URL = '/api'
 
+// SECURITY FIX #101: Cookie-based authentication
+// Configure axios to automatically send cookies with requests
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+  withCredentials: true  // Send cookies automatically
 })
 
+// SECURITY FIX #101: Remove localStorage usage for tokens
+// Tokens are now stored in httpOnly cookies, inaccessible to JavaScript
+// This prevents XSS attacks from stealing authentication tokens
+
+// Keep these functions for backwards compatibility but they no longer store tokens
 const TOKEN_STORAGE_KEY = 'adminToken'
-const TOKEN_EXPIRY_KEY = 'adminTokenExpiry'
-const TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000
 
 const getStoredToken = () => {
-  const token = localStorage.getItem(TOKEN_STORAGE_KEY)
-  const expiry = localStorage.getItem(TOKEN_EXPIRY_KEY)
-
-  if (!token || !expiry) {
-    return null
-  }
-
-  if (Date.now() > parseInt(expiry)) {
-    clearAuth()
-    return null
-  }
-
-  return token
+  // No longer used - authentication is via httpOnly cookies
+  return null
 }
 
 const setStoredToken = (token) => {
-  localStorage.setItem(TOKEN_STORAGE_KEY, token)
-  localStorage.setItem(TOKEN_EXPIRY_KEY, Date.now() + TOKEN_EXPIRY_MS)
+  // No longer used - tokens are set via httpOnly cookies from backend
+  console.warn('setStoredToken is deprecated - using cookie-based auth')
 }
 
 const clearAuth = () => {
+  // Clear any legacy localStorage items
   localStorage.removeItem(TOKEN_STORAGE_KEY)
-  localStorage.removeItem(TOKEN_EXPIRY_KEY)
 }
 
+// Add CSRF token to requests for state-changing operations
 api.interceptors.request.use((config) => {
-  const token = getStoredToken()
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  // For state-changing requests, include CSRF token from cookie
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(config.method?.toUpperCase())) {
+    const csrfToken = getCookie('csrf_token')
+    if (csrfToken) {
+      config.headers['X-CSRFToken'] = csrfToken
+    }
   }
   return config
 })
+
+// Helper function to get cookie value
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) return parts.pop().split(';').shift()
+  return null
+}
 
 api.interceptors.response.use(
   (response) => response,
@@ -67,7 +74,7 @@ export const adminApi = {
   getStats: () => api.get('/admin/stats'),
   getSettings: () => api.get('/admin/settings'),
   updateSettings: (data) => api.put('/admin/settings', data),
-  logout: () => clearAuth()
+  logout: () => api.post('/admin/logout')  // Now calls backend logout endpoint
 }
 
 export const analyticsApi = {

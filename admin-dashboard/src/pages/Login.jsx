@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { adminApi, setStoredToken } from '../api/api'
+import { adminApi } from '../api/api'
 
 function Login({ onLogin }) {
   const [token, setToken] = useState('')
@@ -14,8 +14,10 @@ function Login({ onLogin }) {
     setLoading(true)
 
     try {
+      // SECURITY FIX #101: Cookie-based authentication
+      // Token is sent to backend, which sets httpOnly cookie
+      // No token is stored in localStorage
       await adminApi.login(token)
-      setStoredToken(token)
       onLogin()
       navigate('/')
     } catch (err) {

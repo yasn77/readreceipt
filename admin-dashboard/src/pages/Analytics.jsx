@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { analyticsApi, clearAuth } from '../api/api'
+import { analyticsApi, adminApi } from '../api/api'
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 function Analytics() {
@@ -31,9 +31,15 @@ function Analytics() {
     }
   }
 
-  const handleLogout = () => {
-    clearAuth()
-    navigate('/login')
+  const handleLogout = async () => {
+    // SECURITY FIX #101: Call backend logout to clear cookie
+    try {
+      await adminApi.logout()
+    } catch (error) {
+      console.error('Logout failed:', error)
+    } finally {
+      navigate('/login')
+    }
   }
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8']

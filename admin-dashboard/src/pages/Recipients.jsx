@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { adminApi, clearAuth } from '../api/api'
+import { adminApi } from '../api/api'
 
 function Recipients() {
   const [recipients, setRecipients] = useState([])
@@ -34,9 +34,15 @@ function Recipients() {
     }
   }
 
-  const handleLogout = () => {
-    clearAuth()
-    navigate('/login')
+  const handleLogout = async () => {
+    // SECURITY FIX #101: Call backend logout to clear cookie
+    try {
+      await adminApi.logout()
+    } catch (error) {
+      console.error('Logout failed:', error)
+    } finally {
+      navigate('/login')
+    }
   }
 
   const filteredRecipients = recipients.filter(r =>
