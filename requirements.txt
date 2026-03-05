@@ -9,7 +9,7 @@ psycopg2==2.9.11
 ua-parser==1.0.1
 
 # Testing
-pytest==8.0.0
+pytest==8.4.2
 pytest-cov==4.1.0
 
 # Linting and type checking
