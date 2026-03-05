@@ -33,6 +33,7 @@ Read Receipt is a self-hosted email tracking system that enables you to monitor 
 ### Development
 
 - **[Development Guide](development.md)** - Setting up dev environment
+- **[Logging Configuration](logging.md)** - Structured logging setup
 - **[Contributing](development.md#contributing-process)** - How to contribute
 - **[Troubleshooting](troubleshooting.md)** - Common issues and solutions
 

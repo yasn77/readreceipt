@@ -12,7 +12,7 @@ import os
 import re
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import wraps
 from typing import Any
 
@@ -112,7 +112,7 @@ def get_log_context() -> dict[str, Any]:
         Dictionary containing standard logging fields.
     """
     return {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "request_id": get_request_id(),
         "logging_module": __name__,
         "logging_function": None,  # Will be set by logger
@@ -159,8 +159,8 @@ def configure_logging(
             additional_fields=[
                 "timestamp",
                 "level",
-                "module",
-                "function",
+                "logging_module",
+                "logging_function",
                 "request_id",
                 "user",
                 "action",
@@ -236,6 +236,7 @@ class StructuredLogger:
             "process",
             "taskName",
             "asctime",
+            "message",  # Also exclude message as it's set by the logging system
         }
         filtered_context = {k: v for k, v in context.items() if k not in reserved_attrs}
 
@@ -404,7 +405,11 @@ class RequestIDMiddleware:
         # Calculate duration
         if hasattr(g, "request_start_time"):
             duration_ms = (time.perf_counter() - g.request_start_time) * 1000
-            log_request_end(response.status_code, duration_ms)
+            try:
+                log_request_end(response.status_code, duration_ms)
+            except Exception:
+                # Silently ignore logging errors to prevent breaking the application
+                pass
 
         return response
 

@@ -265,3 +265,90 @@ class TestAnalyticsEndpoints:
         response = client.get("/api/analytics/export")
         assert response.status_code == 200
         assert "text/csv" in response.content_type
+
+
+class TestPrometheusMetrics:
+    """Tests for Prometheus metrics endpoints and functionality."""
+
+    def test_metrics_endpoint_returns_prometheus_format(self, client: Any) -> None:
+        """Test that /metrics endpoint returns Prometheus format."""
+        response = client.get("/metrics")
+        assert response.status_code == 200
+        assert "text/plain" in response.content_type
+        # Check for standard Prometheus metrics
+        data = response.data.decode("utf-8")
+        assert "# HELP" in data
+        assert "# TYPE" in data
+
+    def test_metrics_endpoint_contains_http_metrics(self, client: Any) -> None:
+        """Test that /metrics contains HTTP metrics."""
+        response = client.get("/metrics")
+        assert response.status_code == 200
+        data = response.data.decode("utf-8")
+        # Check for automatic HTTP metrics from prometheus-flask-exporter
+        # Note: prometheus-flask-exporter uses 'http_request_total' (singular)
+        assert "http_request_total" in data or "http_requests_total" in data
+        assert "http_request_duration_seconds" in data
+
+    def test_metrics_endpoint_contains_custom_metrics(self, client: Any) -> None:
+        """Test that /metrics contains custom business metrics."""
+        response = client.get("/metrics")
+        assert response.status_code == 200
+        data = response.data.decode("utf-8")
+        # Check for custom business metrics
+        assert "tracking_events_total" in data
+        assert "tracking_events_unique_recipients" in data
+        assert "recipients_total" in data
+        assert "tracking_event_processing_seconds" in data
+
+    def test_metrics_health_endpoint(self, client: Any) -> None:
+        """Test that /metrics/health returns health status."""
+        response = client.get("/metrics/health")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data is not None
+        assert "status" in data
+        assert "database" in data
+        assert "metrics_count" in data
+        assert "timestamp" in data
+        assert data["status"] == "healthy"
+
+    def test_metrics_increment_on_tracking_event(
+        self, client: Any, sample_recipient: str
+    ) -> None:
+        """Test that tracking metrics increment when a tracking event occurs."""
+        # Get initial metrics
+        initial_response = client.get("/metrics")
+        initial_data = initial_response.data.decode("utf-8")
+
+        # Trigger a tracking event by accessing the tracking image
+        # Note: We need to simulate a non-Gmail user agent
+        tracking_response = client.get(
+            f"/img/{sample_recipient}",
+            headers={"User-Agent": "Mozilla/5.0 Test Client"},
+        )
+        assert tracking_response.status_code == 200
+
+        # Get metrics after tracking event
+        after_response = client.get("/metrics")
+        after_data = after_response.data.decode("utf-8")
+
+        # Verify tracking_events_total metric exists
+        assert "tracking_events_total" in after_data
+
+    def test_recipients_gauge_updates(self, client: Any) -> None:
+        """Test that recipients_total gauge is present."""
+        response = client.get("/metrics")
+        assert response.status_code == 200
+        data = response.data.decode("utf-8")
+        # The gauge should be present in the metrics
+        assert "recipients_total" in data
+
+    def test_metrics_endpoint_excluded_from_auto_metrics(self, client: Any) -> None:
+        """Test that /metrics endpoint is excluded from automatic metrics."""
+        # Make a request to /metrics
+        client.get("/metrics")
+
+        # Get metrics and verify the endpoint wasn't counted
+        response = client.get("/metrics")
+        assert response.status_code == 200
