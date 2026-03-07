@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import csv
 import io
+import json
+import logging
 import os
 import uuid
 from collections.abc import Callable
@@ -10,12 +12,15 @@ from functools import update_wrapper, wraps
 from io import StringIO
 from typing import Any
 
-from flask import Flask, json, make_response, request, send_file
+from flask import Flask, g, json, make_response, request, send_file
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from PIL import Image
 from sqlalchemy_utils import CountryType, IPAddressType
 from ua_parser import user_agent_parser
+
+# Import security module
+from security import init_security, require_admin
 
 # Import OIDC provider
 from oidc_provider import OIDCProvider, jwt_verification_required, validate_token
@@ -27,8 +32,12 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
     "SQLALCHEMY_DATABASE_URI", "sqlite:///:memory:"
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", os.urandom(32).hex())
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+
+# Initialize security features (headers, rate limiting, input validation, logging, RBAC)
+limiter = init_security(app)
 
 # Initialise OIDC provider
 oidc = OIDCProvider(app)
@@ -88,15 +97,36 @@ def root_path() -> str:
 @app.route("/new-uuid")
 def new_uuid() -> str:
     this_uuid = str(uuid.uuid4())
-    description = request.args.get("description")
-    email = request.args.get("email")
-
-    entry = Recipients(r_uuid=this_uuid, description=description, email=email)
+    
+    # Get and validate parameters (Issue #107)
+    description = request.args.get("description", "")
+    email = request.args.get("email", "")
+    
+    # Validate email format
+    if email:
+        email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        import re
+        if not re.match(email_pattern, email) or len(email) > 254:
+            return json.jsonify({"error": "Invalid email format"}), 400
+    
+    # Sanitize and limit description length (Issue #107)
+    import bleach
+    if description:
+        description = bleach.clean(description, tags=[], strip=True)
+        if len(description) > 500:
+            description = description[:497] + "..."
+    
+    # Create recipient with validated data
+    entry = Recipients(
+        r_uuid=this_uuid, 
+        description=description or "", 
+        email=email or ""
+    )
 
     r = f"""
     <p>{this_uuid}<p>
 
-    {description} {email}
+    {description or ""} {email or ""}
     """
     db.session.add(entry)
     db.session.commit()
@@ -111,16 +141,48 @@ def send_img(this_uuid: str) -> Any:
     if r_model is None:
         return json.jsonify({"error": "Recipient not found"}), 404
 
+    # Build details with sanitized data (Issue #107, #108)
     details: dict[str, Any] = {}
-    details["user_agent"] = request.headers.get("User-Agent")
-    details["headers"] = dict(request.headers)
-    details["remote_addr"] = request.remote_addr
-    details["referrer"] = request.referrer
-    details["values"] = request.values
-    details["date"] = request.date
+    
+    # Safely get user agent with length limit
+    user_agent = request.headers.get("User-Agent", "")[:512]
+    details["user_agent"] = user_agent
+    
+    # Sanitize headers - remove sensitive data (Issue #108)
+    safe_headers = {}
+    sensitive_headers = [
+        "authorization", "cookie", "set-cookie", "x-api-key", 
+        "x-auth-token", "cf-connecting-ip", "x-forwarded-for"
+    ]
+    for header_name, header_value in request.headers:
+        header_lower = header_name.lower()
+        if header_lower not in sensitive_headers:
+            # Truncate long header values
+            safe_headers[header_name] = header_value[:1024]
+    details["headers"] = safe_headers
+    
+    # Don't log raw remote_addr in details (it's already in access logs)
+    details["remote_addr"] = "***REDACTED***"
+    
+    # Sanitize referrer
+    referrer = request.referrer
+    if referrer:
+        # Truncate and sanitize referrer
+        details["referrer"] = referrer[:512] if len(referrer) <= 512 else referrer[:509] + "..."
+    else:
+        details["referrer"] = None
+    
+    # Only store safe query parameters
+    safe_values = {}
+    for key, value in request.values.items():
+        if key.lower() not in ["token", "password", "secret", "email"]:
+            safe_values[key] = str(value)[:256]
+    details["values"] = safe_values
+    
+    details["date"] = datetime.now().isoformat()
 
-    print(r_model.id)
-    print(json.dumps(details))
+    # Log tracking event safely (Issue #108)
+    app.logger.info(f"Tracking event for UUID: {this_uuid[:8]}... from {request.remote_addr}")
 
     img_io = io.BytesIO()
     img = Image.new("RGBA", (1, 1), (255, 255, 255, 0))
@@ -173,13 +235,33 @@ def admin_required(
 @app.route("/api/admin/login", methods=["POST"])
 def admin_login() -> Any:
     """Admin login endpoint with token authentication."""
+    # Validate request data (Issue #107)
+    if not request.is_json:
+        return json.jsonify({"error": "Content-Type must be application/json"}), 400
+    
     data = request.get_json()
+    if not data or "token" not in data:
+        return json.jsonify({"error": "Token is required"}), 400
+    
     token = data.get("token")
+    
+    # Validate token format (Issue #107)
+    if not isinstance(token, str) or len(token) > 1024:
+        return json.jsonify({"error": "Invalid token format"}), 400
 
     admin_token = os.environ.get("ADMIN_TOKEN", "admin")
 
     if token == admin_token:
+        # Audit successful login (Issue #109)
+        app.logger.info(
+            f"AUDIT: Admin login successful from {request.remote_addr}"
+        )
         return json.jsonify({"status": "authenticated"}), 200
+    
+    # Log failed login attempt (Issue #109)
+    app.logger.warning(
+        f"AUDIT: Failed admin login attempt from {request.remote_addr}"
+    )
     return json.jsonify({"error": "Invalid token"}), 401
 
 
@@ -227,7 +309,7 @@ def admin_protected() -> Any:
 
 
 @app.route("/api/admin/recipients", methods=["GET"])
-@admin_required
+@require_admin
 def get_recipients() -> Any:
     """Get all recipients."""
     recipients = Recipients.query.all()
@@ -248,21 +330,47 @@ def get_recipients() -> Any:
 
 
 @app.route("/api/admin/recipients", methods=["POST"])
-@admin_required
+@require_admin
 def create_recipient() -> Any:
     """Create a new recipient."""
+    # Validate input (Issue #107)
+    if not request.is_json:
+        return json.jsonify({"error": "Content-Type must be application/json"}), 400
+    
     data = request.get_json()
+    if not data:
+        return json.jsonify({"error": "Request body is required"}), 400
 
     if not data.get("email"):
         return json.jsonify({"error": "Email is required"}), 400
+    
+    # Validate email format (Issue #107)
+    import re
+    email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+    if not re.match(email_pattern, data["email"]) or len(data["email"]) > 254:
+        return json.jsonify({"error": "Invalid email format"}), 400
+    
+    # Sanitize description (Issue #107)
+    import bleach
+    description = data.get("description", "")
+    if description:
+        description = bleach.clean(description, tags=[], strip=True)
+        if len(description) > 500:
+            description = description[:497] + "..."
+        data["description"] = description
 
     recipient = Recipients(
         r_uuid=str(uuid.uuid4()),
-        description=data.get("description", ""),
-        email=data["email"],
+        description=description,
+        email=data["email"][:254],  # Limit email length
     )
     db.session.add(recipient)
     db.session.commit()
+
+    # Audit creation (Issue #109)
+    app.logger.info(
+        f"AUDIT: Recipient created - email: {data['email'][:3]}*** by admin"
+    )
 
     return (
         json.jsonify(
@@ -278,18 +386,38 @@ def create_recipient() -> Any:
 
 
 @app.route("/api/admin/recipients/<int:recipient_id>", methods=["PUT"])
-@admin_required
+@require_admin
 def update_recipient(recipient_id: int) -> Any:
     """Update a recipient."""
     recipient = Recipients.query.get_or_404(recipient_id)
+    
+    # Validate input (Issue #107)
+    if not request.is_json:
+        return json.jsonify({"error": "Content-Type must be application/json"}), 400
+    
     data = request.get_json()
-
+    if not data:
+        return json.jsonify({"error": "Request body is required"}), 400
+    
+    import re
+    import bleach
+    
     if "description" in data:
-        recipient.description = data["description"]
+        # Sanitize description
+        description = bleach.clean(str(data["description"]), tags=[], strip=True)
+        recipient.description = description[:500]
+    
     if "email" in data:
-        recipient.email = data["email"]
+        # Validate email format
+        email = data["email"]
+        if not re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", email):
+            return json.jsonify({"error": "Invalid email format"}), 400
+        recipient.email = email[:254]
 
     db.session.commit()
+    
+    # Audit update (Issue #109)
+    app.logger.info(f"AUDIT: Recipient {recipient_id} updated by admin")
 
     return (
         json.jsonify(
@@ -305,18 +433,25 @@ def update_recipient(recipient_id: int) -> Any:
 
 
 @app.route("/api/admin/recipients/<int:recipient_id>", methods=["DELETE"])
-@admin_required
+@require_admin
 def delete_recipient(recipient_id: int) -> Any:
     """Delete a recipient."""
     recipient = Recipients.query.get_or_404(recipient_id)
+    
+    # Store ID for audit log before deletion
+    recipient_uuid = recipient.r_uuid
+    
     db.session.delete(recipient)
     db.session.commit()
+    
+    # Audit deletion (Issue #109)
+    app.logger.info(f"AUDIT: Recipient {recipient_uuid} deleted by admin")
 
     return json.jsonify({"status": "deleted"}), 200
 
 
 @app.route("/api/admin/stats", methods=["GET"])
-@admin_required
+@require_admin
 def get_admin_stats() -> Any:
     """Get dashboard statistics."""
     total_recipients = Recipients.query.count()
@@ -336,7 +471,7 @@ def get_admin_stats() -> Any:
                 "unique_opens": Tracking.query.distinct(Tracking.recipients_id).count(),
                 "recent_events": [
                     {
-                        "email": Tracking.recipients_id,
+                        "id": event.id,
                         "timestamp": (
                             event.timestamp.isoformat() if event.timestamp else None
                         ),
@@ -350,7 +485,7 @@ def get_admin_stats() -> Any:
 
 
 @app.route("/api/admin/settings", methods=["GET"])
-@admin_required
+@require_admin
 def get_settings() -> Any:
     """Get application settings."""
     return (
@@ -366,15 +501,34 @@ def get_settings() -> Any:
 
 
 @app.route("/api/admin/settings", methods=["PUT"])
-@admin_required
+@require_admin
 def update_settings() -> Any:
     """Update application settings (in-memory for now)."""
+    # Validate input (Issue #107)
+    if not request.is_json:
+        return json.jsonify({"error": "Content-Type must be application/json"}), 400
+    
     data = request.get_json()
-    return json.jsonify({"status": "updated", "settings": data}), 200
+    if not data:
+        return json.jsonify({"error": "Request body is required"}), 400
+    
+    # Sanitize values
+    import bleach
+    safe_data = {}
+    for key, value in data.items():
+        if isinstance(value, str):
+            safe_data[key] = bleach.clean(value, tags=[], strip=True)[:500]
+        else:
+            safe_data[key] = value
+    
+    # Audit settings change (Issue #109)
+    app.logger.info(f"AUDIT: Settings updated by admin - keys: {list(safe_data.keys())}")
+    
+    return json.jsonify({"status": "updated", "settings": safe_data}), 200
 
 
 @app.route("/api/analytics/summary", methods=["GET"])
-@admin_required
+@require_admin
 def get_analytics_summary() -> Any:
     """Get analytics summary."""
     total_events = Tracking.query.count()
@@ -405,11 +559,23 @@ def get_analytics_summary() -> Any:
 
 
 @app.route("/api/analytics/events", methods=["GET"])
-@admin_required
+@require_admin
 def get_analytics_events() -> Any:
     """Get time-series event data."""
+    # Validate and sanitize range parameter (Issue #107)
     range_days = request.args.get("range", "7d")
+    
+    # Validate format - only allow digits followed by 'd'
+    import re
+    if not re.match(r"^\d+d$", range_days):
+        return json.jsonify({"error": "Invalid range format. Use format like '7d', '30d'"}), 400
+    
     days = int(range_days.replace("d", ""))
+    
+    # Limit range to prevent abuse (max 365 days)
+    if days > 365 or days < 1:
+        return json.jsonify({"error": "Range must be between 1 and 365 days"}), 400
+    
     start_date = datetime.now() - timedelta(days=days)
 
     events = Tracking.query.filter(Tracking.timestamp >= start_date).all()
@@ -432,7 +598,7 @@ def get_analytics_events() -> Any:
 
 
 @app.route("/api/analytics/recipients", methods=["GET"])
-@admin_required
+@require_admin
 def get_analytics_recipients() -> Any:
     """Get top recipients by opens."""
     top_recipients = (
@@ -452,7 +618,7 @@ def get_analytics_recipients() -> Any:
 
 
 @app.route("/api/analytics/geo", methods=["GET"])
-@admin_required
+@require_admin
 def get_analytics_geo() -> Any:
     """Get geographic distribution."""
     geo_data = (
@@ -473,7 +639,7 @@ def get_analytics_geo() -> Any:
 
 
 @app.route("/api/analytics/clients", methods=["GET"])
-@admin_required
+@require_admin
 def get_analytics_clients() -> Any:
     """Get email client breakdown."""
     events = Tracking.query.all()
@@ -516,7 +682,7 @@ def get_analytics_clients() -> Any:
 
 
 @app.route("/api/analytics/export", methods=["GET"])
-@admin_required
+@require_admin
 def export_analytics() -> Any:
     """Export analytics data as CSV."""
     events = Tracking.query.all()
@@ -537,6 +703,10 @@ def export_analytics() -> Any:
         )
 
     output.seek(0)
+    
+    # Audit export (Issue #109)
+    app.logger.info(f"AUDIT: Analytics export requested by admin")
+    
     return (
         output.getvalue(),
         200,
