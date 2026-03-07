@@ -11,10 +11,10 @@ from io import StringIO
 from typing import Any
 
 from flask import Flask, json, make_response, request, send_file
-from flask_migrate import Migrate  # type: ignore[import-untyped]
+from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from PIL import Image
-from sqlalchemy_utils import CountryType, IPAddressType  # type: ignore[import-untyped]
+from sqlalchemy_utils import CountryType, IPAddressType
 from ua_parser import user_agent_parser
 
 app = Flask(__name__)
@@ -56,9 +56,9 @@ def nocache(view: Callable) -> Callable:
     def no_cache(*args: Any, **kwargs: Any) -> Any:
         response = make_response(view(*args, **kwargs))
         response.headers["Last-Modified"] = datetime.now()
-        response.headers[
-            "Cache-Control"
-        ] = "no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0"
+        response.headers["Cache-Control"] = (
+            "no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0"
+        )
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "-1"
         return response
@@ -130,7 +130,6 @@ def send_img(this_uuid: str) -> Any:
     return send_file(img_io, download_name="1.png", mimetype="image/png")  # type: ignore[call-arg]
 
 
-
 def admin_required(
     f: Callable,
 ) -> Callable:
@@ -155,6 +154,7 @@ def admin_required(
         return f(*args, **kwargs)
 
     return decorated
+
 
 @app.route("/api/admin/login", methods=["POST"])
 def admin_login() -> Any:

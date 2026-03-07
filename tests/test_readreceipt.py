@@ -240,9 +240,7 @@ class TestAnalyticsEndpoints:
 
     def test_get_analytics_events(self, client: Any) -> None:
         """Test getting analytics events."""
-        response = client.get(
-            "/api/analytics/events?range=7d", headers=auth_headers()
-        )
+        response = client.get("/api/analytics/events?range=7d", headers=auth_headers())
         assert response.status_code == 200
         data = response.get_json()
         assert isinstance(data, list)
