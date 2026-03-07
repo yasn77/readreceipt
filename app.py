@@ -460,7 +460,16 @@ def send_img(this_uuid: str) -> Any:
 
     ua = user_agent_parser.Parse(details["user_agent"])
 
-    if not ua["user_agent"]["family"] == "GmailImageProxy":
+    # Issue #150: Cookie-based own-open filtering
+    # Check if rr_ignore_me cookie is present - if so, skip tracking
+    rr_ignore_me = request.cookies.get("rr_ignore_me")
+    if rr_ignore_me:
+        app.logger.info(f"Skipping tracking for UUID {this_uuid[:8]}... - rr_ignore_me cookie present")
+
+    # Only record tracking if:
+    # 1. Not Gmail's proxy (existing check)
+    # 2. rr_ignore_me cookie is NOT present (new check for Issue #150)
+    if not ua["user_agent"]["family"] == "GmailImageProxy" and not rr_ignore_me:
         entry = Tracking(
             recipients_id=r_model.id,
             timestamp=datetime.now(),
@@ -1062,6 +1071,7 @@ def get_settings() -> Any:
                 "tracking_enabled": True,
                 "allowed_domains": os.environ.get("EXTENSION_ALLOWED_ORIGINS", ""),
                 "log_level": os.environ.get("LOG_LEVEL", "INFO"),
+                "cookie_filtering_enabled": os.environ.get("COOKIE_FILTERING_ENABLED", "true").lower() == "true",
             }
         ),
         200,
@@ -1283,3 +1293,43 @@ def export_analytics() -> Any:
             "Content-Disposition": "attachment; filename=analytics_export.csv",
         },
     )
+
+
+# ============================================================================
+# Cookie-Based Own-Open Filtering Endpoints (Issue #150)
+# ============================================================================
+
+
+@app.route("/api/cookie/set", methods=["POST"])
+def set_ignore_cookie() -> Any:
+    """Set the rr_ignore_me cookie to prevent tracking when viewing sent folder.
+    
+    This endpoint is called by the admin dashboard when the user enables
+    cookie-based own-open filtering (Issue #150).
+    """
+    response = make_response(json.jsonify({"status": "cookie_set"}), 200)
+    # Set cookie for 30 days, secure and httponly for security
+    response.set_cookie(
+        "rr_ignore_me",
+        "true",
+        max_age=30 * 24 * 60 * 60,  # 30 days
+        httponly=True,
+        secure=request.is_secure,
+        samesite="Lax",
+    )
+    return response
+
+
+@app.route("/api/cookie/clear", methods=["POST"])
+def clear_ignore_cookie() -> Any:
+    """Clear the rr_ignore_me cookie to re-enable tracking."""
+    response = make_response(json.jsonify({"status": "cookie_cleared"}), 200)
+    response.set_cookie(
+        "rr_ignore_me",
+        "",
+        max_age=0,
+        httponly=True,
+        secure=request.is_secure,
+        samesite="Lax",
+    )
+    return response
