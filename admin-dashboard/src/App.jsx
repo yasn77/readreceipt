@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Recipients from './pages/Recipients'
@@ -7,12 +7,10 @@ import Settings from './pages/Settings'
 import Analytics from './pages/Analytics'
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-
-  useEffect(() => {
-    const token = localStorage.getItem('adminToken')
-    setIsAuthenticated(!!token)
-  }, [])
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    // Lazy initial state - read from localStorage once on mount
+    return !!localStorage.getItem('adminToken')
+  })
 
   return (
     <Routes>

@@ -18,7 +18,7 @@ function Login({ onLogin }) {
       localStorage.setItem('adminToken', token)
       onLogin()
       navigate('/')
-    } catch (err) {
+    } catch {
       setError('Invalid token. Please try again.')
     } finally {
       setLoading(false)

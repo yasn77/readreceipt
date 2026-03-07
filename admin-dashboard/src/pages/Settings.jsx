@@ -34,7 +34,7 @@ function Settings() {
     try {
       await adminApi.updateSettings(settings)
       setMessage('Settings saved successfully!')
-    } catch (error) {
+    } catch {
       setMessage('Failed to save settings')
     } finally {
       setSaving(false)
