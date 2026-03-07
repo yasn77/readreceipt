@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { analyticsApi } from '../api/api'
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 function Analytics() {
   const [summary, setSummary] = useState(null)
