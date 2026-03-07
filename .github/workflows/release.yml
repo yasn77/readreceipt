@@ -8,16 +8,23 @@ on:
 permissions:
   contents: write
   packages: write
+  id-token: write
 
 jobs:
   build_release:
-    name: Build and Release
-    runs-on: readreceipt
+    name: Build and Release Assets
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Get Version from Tag
+        id: get_version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -25,23 +32,167 @@ jobs:
           python-version: "3.14"
           cache: "pip"
 
-      - name: Install Dependencies
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+
+      - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pyinstaller -r requirements.txt
 
-      - name: Build Binary
+      - name: Build Python Binary
         run: |
           pyinstaller --onefile --name readreceipt-linux-amd64 app.py
 
-      - name: ZIP Extension
+      - name: Build Chrome Extension
         run: |
-          zip -r readreceipt-extension.zip manifest.json background.js content.js popup.html extensions/
+          cd extensions/chrome
+          zip -r ../../readreceipt-chrome-extension.zip .
+
+      - name: Build Firefox Extension
+        run: |
+          cd extensions/firefox
+          zip -r ../../readreceipt-firefox-extension.xpi .
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      - name: Package Helm Chart
+        run: |
+          helm package helm/readreceipt --version ${{ steps.get_version.outputs.version }} --app-version v${{ steps.get_version.outputs.version }}
+
+      - name: Upload Helm Chart
+        uses: actions/upload-artifact@v4
+        with:
+          name: helm-chart
+          path: readreceipt-${{ steps.get_version.outputs.version }}.tgz
+
+      - name: Validate Semantic Version
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          if ! [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: Version $VERSION is not a valid semantic version (must be X.Y.Z)"
+            exit 1
+          fi
+          echo "✓ Valid semantic version: $VERSION"
+
+  create_release:
+    name: Create GitHub Release
+    needs: build_release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Helm Chart
+        uses: actions/download-artifact@v4
+        with:
+          name: helm-chart
+          path: ./
+
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          PREV_TAG=$(git describe --tags --abbrev=0 $TAG^ 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            echo "notes=Initial release" >> $GITHUB_OUTPUT
+          else
+            echo "notes<<EOF" >> $GITHUB_OUTPUT
+            git log --pretty=format:"- %s (%h)" $PREV_TAG..$TAG >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          body: |
+            ## Release ${{ needs.build_release.outputs.version }}
+
+            ${{ steps.release_notes.outputs.notes }}
+
+            ## Assets Included
+            - Chrome Extension (.zip)
+            - Firefox Extension (.xpi)
+            - Docker Image (ghcr.io/${{ github.repository }}:${{ needs.build_release.outputs.version }})
+            - Helm Chart (readreceipt-${{ needs.build_release.outputs.version }}.tgz)
+            - Linux Binary (readreceipt-linux-amd64)
+
+            ## Installation
+
+            ### Chrome Extension
+            1. Download `readreceipt-chrome-extension.zip`
+            2. Extract the zip file
+            3. Go to `chrome://extensions/`
+            4. Enable "Developer mode"
+            5. Click "Load unpacked" and select the extracted folder
+
+            ### Firefox Extension
+            1. Download `readreceipt-firefox-extension.xpi`
+            2. Go to `about:addons`
+            3. Click the gear icon → "Install Add-on From File"
+            4. Select the .xpi file
+
+            ### Docker
+            ```bash
+            docker pull ghcr.io/${{ github.repository }}:${{ needs.build_release.outputs.version }}
+            docker run -p 8000:8000 ghcr.io/${{ github.repository }}:${{ needs.build_release.outputs.version }}
+            ```
+
+            ### Kubernetes (Helm)
+            ```bash
+            helm repo add readreceipt https://yasn77.github.io/readreceipt/
+            helm install readreceipt readreceipt/readreceipt --version ${{ needs.build_release.outputs.version }}
+            ```
+
+            ### Linux Binary
+            ```bash
+            chmod +x readreceipt-linux-amd64
+            ./readreceipt-linux-amd64
+            ```
+
+            ## Full Changelog
+            https://github.com/${{ github.repository }}/compare/${{ steps.release_notes.outputs.prev_tag }}...${{ github.ref }}
           files: |
             dist/readreceipt-linux-amd64
-            readreceipt-extension.zip
+            readreceipt-chrome-extension.zip
+            readreceipt-firefox-extension.xpi
+            readreceipt-${{ needs.build_release.outputs.version }}.tgz
