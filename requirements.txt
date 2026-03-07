@@ -12,7 +12,7 @@ bleach==6.2.0
 
 # OIDC and JWT support
 PyJWT==2.10.1
-cryptography==45.0.5
+cryptography==46.0.5
 
 # Testing
 pytest==9.0.2
