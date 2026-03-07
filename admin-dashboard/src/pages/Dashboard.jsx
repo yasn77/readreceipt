@@ -1,13 +1,19 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { adminApi } from '../api/api'
+import { useAuth } from 'react-oidc-context'
+import { userManager } from '../api/api'
 
-function Dashboard() {
+function Dashboard({ onLogout }) {
+  const auth = useAuth()
+  const navigate = useNavigate()
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState(null)
 
   useEffect(() => {
     loadStats()
+    loadUserInfo()
   }, [])
 
   const loadStats = async () => {
@@ -18,6 +24,32 @@ function Dashboard() {
       console.error('Failed to load stats:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadUserInfo = async () => {
+    try {
+      const currentUser = await userManager.getUser()
+      setUser(currentUser)
+    } catch (error) {
+      console.error('Failed to load user info:', error)
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      await auth.signoutRedirect()
+      if (onLogout) {
+        onLogout()
+      }
+    } catch (error) {
+      console.error('Logout error:', error)
+      // Fallback: clear local state and redirect
+      await userManager.removeUser()
+      if (onLogout) {
+        onLogout()
+      }
+      navigate('/login')
     }
   }
 
@@ -64,6 +96,19 @@ function Dashboard() {
                   Settings
                 </Link>
               </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              {user && (
+                <div className="text-sm text-gray-700 hidden md:block">
+                  <span className="font-medium">{user.profile.email || user.profile.sub}</span>
+                </div>
+              )}
+              <button
+                onClick={handleLogout}
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                Sign Out
+              </button>
             </div>
           </div>
         </div>
