@@ -15,6 +15,9 @@ from PIL import Image
 from sqlalchemy_utils import CountryType, IPAddressType
 from ua_parser import user_agent_parser
 
+# Import OIDC provider
+from oidc_provider import OIDCProvider, jwt_verification_required
+
 app = Flask(__name__)
 # app.config ['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'
 # app.config ['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:XXXXXX@XXXXX/readreceipt'
@@ -24,6 +27,17 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+
+# Initialise OIDC provider
+oidc = OIDCProvider(app)
+
+# Register a demo OIDC client (for testing/development)
+oidc.register_client(
+    client_id="readreceipt-admin",
+    client_secret=os.environ.get("OIDC_CLIENT_SECRET", "admin-secret"),
+    redirect_uris=["http://localhost:3000/callback", "http://localhost:8080/callback"],
+    grant_types=["authorization_code", "refresh_token"],
+)
 
 
 class Recipients(db.Model):  # type: ignore[name-defined]
@@ -139,6 +153,45 @@ def admin_login() -> Any:
     if token == admin_token:
         return json.jsonify({"status": "authenticated"}), 200
     return json.jsonify({"error": "Invalid token"}), 401
+
+
+@app.route("/api/admin/oidc/login", methods=["POST"])
+def admin_oidc_login() -> Any:
+    """Admin login endpoint with OIDC token authentication."""
+    data = request.get_json()
+    access_token = data.get("access_token")
+
+    if not access_token:
+        return json.jsonify({"error": "access_token is required"}), 400
+
+    # Validate the OIDC token
+    payload = validate_token(access_token, oidc)
+    if payload is None:
+        return json.jsonify({"error": "Invalid or expired token"}), 401
+
+    return json.jsonify({
+        "status": "authenticated",
+        "user": {
+            "sub": payload.get("sub"),
+            "scope": payload.get("scope"),
+        }
+    }), 200
+
+
+@app.route("/api/admin/protected", methods=["GET"])
+@jwt_verification_required(oidc)
+def admin_protected() -> Any:
+    """Protected admin endpoint requiring valid OIDC token."""
+    # Access the decoded JWT payload from request context
+    payload = request.oidc_payload  # type: ignore[attr-defined]
+    return json.jsonify({
+        "status": "access_granted",
+        "message": "Welcome to the protected area",
+        "user": {
+            "sub": payload.get("sub"),
+            "scope": payload.get("scope"),
+        }
+    }), 200
 
 
 @app.route("/api/admin/recipients", methods=["GET"])

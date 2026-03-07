@@ -8,6 +8,10 @@ gunicorn==25.1.0
 psycopg2==2.9.11
 ua-parser==1.0.1
 
+# OIDC and JWT support
+PyJWT==2.10.1
+cryptography==45.0.5
+
 # Testing
 pytest==9.0.2
 pytest-cov==7.0.0
