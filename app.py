@@ -61,6 +61,7 @@ migrate = Migrate(app, db)
 limiter = init_security(app)
 
 # Initialise OIDC provider (for acting as OIDC server)
+oidc = OIDCProvider(app)
 
 # Register a demo OIDC client (for testing/development)
 oidc.register_client(
