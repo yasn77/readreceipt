@@ -11,7 +11,7 @@ env:
 
 jobs:
   build-push-image:
-    runs-on: yasn77-standard
+    runs-on: readreceipt
     permissions:
       contents: write
       packages: write
