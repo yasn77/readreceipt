@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
+
 import pytest
 from flask.testing import FlaskClient
 
@@ -9,7 +11,7 @@ from app import app
 
 
 @pytest.fixture
-def client() -> FlaskClient:
+def client() -> Generator[FlaskClient, None, None]:
     """Create test client."""
     app.config["TESTING"] = True
     with app.test_client() as client:
@@ -189,7 +191,7 @@ class TestOIDCClientRegistration:
 
 
 @pytest.fixture
-def auth_code_flow_client() -> tuple[FlaskClient, dict]:  # type: ignore[misc]
+def auth_code_flow_client() -> Generator[tuple[FlaskClient, dict], None, None]:
     """Test client for full auth code flow."""
     app.config["TESTING"] = True
     with app.test_client() as client:
@@ -217,7 +219,7 @@ def auth_code_flow_client() -> tuple[FlaskClient, dict]:  # type: ignore[misc]
         )
         token_data = token_response.get_json()
 
-        yield client, token_data  # type: ignore[misc]
+        yield (client, token_data)
 
 
 class TestFullAuthCodeFlow:

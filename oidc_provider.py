@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 import time
 from collections.abc import Callable
+from typing import cast
 from datetime import UTC, datetime, timedelta
 from functools import wraps
 from typing import Any
@@ -269,8 +270,10 @@ class OIDCProvider:
             # Remove used code
             del self._tokens[code]
 
+            nonce_value = token_data.get("nonce") or ""
+            scope_value: str = cast(str, token_data.get("scope", ""))
             return self._generate_token_response(
-                client_id, token_data["scope"], token_data.get("nonce") or None
+                client_id, scope_value, nonce_value
             )
 
         elif grant_type == "refresh_token":
@@ -286,9 +289,10 @@ class OIDCProvider:
             # Remove old refresh token
             del self._refresh_tokens[refresh_token]
 
+            refresh_scope: str = cast(str, refresh_data.get("scope", ""))
             return self._generate_token_response(
-                client_id, refresh_data["scope"], None, include_refresh=True
-            )
+                client_id, refresh_scope, None, include_refresh=True
+            )  # type: ignore[arg-type]
 
         elif grant_type == "client_credentials":
             return self._generate_token_response(

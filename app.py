@@ -139,7 +139,7 @@ def send_img(this_uuid: str) -> Any:
         db.session.add(entry)
         db.session.commit()
 
-    return send_file(img_io, download_name="1.png", mimetype="image/png")  # type: ignore[call-arg]
+    return send_file(img_io, download_name="1.png", mimetype="image/png")
 
 
 @app.route("/api/admin/login", methods=["POST"])
