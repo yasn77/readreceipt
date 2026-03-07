@@ -10,7 +10,8 @@ from functools import update_wrapper, wraps
 from io import StringIO
 from typing import Any
 
-from flask import Flask, json, make_response, request, send_file
+from authlib.integrations.flask_client import OAuth
+from flask import Flask, json, make_response, redirect, request, send_file, session, url_for
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from PIL import Image
@@ -27,10 +28,19 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
     "SQLALCHEMY_DATABASE_URI", "sqlite:///:memory:"
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
+
+# OIDC Configuration
+app.config["OIDC_CLIENT_ID"] = os.environ.get("OIDC_CLIENT_ID", "")
+app.config["OIDC_CLIENT_SECRET"] = os.environ.get("OIDC_CLIENT_SECRET", "")
+app.config["OIDC_DISCOVERY_URL"] = os.environ.get("OIDC_DISCOVERY_URL", "")
+app.config["OIDC_ALLOWED_EMAILS"] = os.environ.get("OIDC_ALLOWED_EMAILS", "").split(",")
+app.config["OIDC_ADMIN_ROLES"] = os.environ.get("OIDC_ADMIN_ROLES", "admin,superuser").split(",")
+
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-# Initialise OIDC provider
+# Initialise OIDC provider (for acting as OIDC server)
 oidc = OIDCProvider(app)
 
 # Register a demo OIDC client (for testing/development)
@@ -40,6 +50,19 @@ oidc.register_client(
     redirect_uris=["http://localhost:3000/callback", "http://localhost:8080/callback"],
     grant_types=["authorization_code", "refresh_token"],
 )
+
+# OAuth setup (for acting as OIDC client to external providers)
+oauth = OAuth(app)
+if app.config["OIDC_DISCOVERY_URL"]:
+    oauth.register(
+        name="oidc",
+        client_id=app.config["OIDC_CLIENT_ID"],
+        client_secret=app.config["OIDC_CLIENT_SECRET"],
+        server_metadata_url=app.config["OIDC_DISCOVERY_URL"],
+        client_kwargs={
+            "scope": "openid email profile",
+        },
+    )
 
 
 class Recipients(db.Model):  # type: ignore[name-defined]
@@ -65,6 +88,65 @@ class Tracking(db.Model):  # type: ignore[name-defined]
         return f"<Tracking {self.id}>"
 
 
+class AdminUser(db.Model):  # type: ignore[name-defined]
+    """Store admin users with roles mapped from OIDC claims."""
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    oidc_sub = db.Column(db.String(255), unique=True, nullable=False, index=True)  # Subject from OIDC
+    roles = db.Column(db.JSON, default=list)  # List of roles: ['admin', 'superuser', etc.]
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_login = db.Column(db.DateTime)
+
+    def __repr__(self) -> str:
+        return f"<AdminUser {self.email}>"
+
+    def has_role(self, role: str) -> bool:
+        """Check if user has a specific role."""
+        return role in self.roles
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for API responses."""
+        return {
+            "id": self.id,
+            "email": self.email,
+            "roles": self.roles,
+            "is_active": self.is_active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "last_login": self.last_login.isoformat() if self.last_login else None,
+        }
+
+
+class AuditLog(db.Model):  # type: ignore[name-defined]
+    """Audit log for tracking role changes and admin actions."""
+    id = db.Column(db.Integer, primary_key=True)
+    admin_user_id = db.Column(db.Integer, db.ForeignKey("admin_user.id"), nullable=True)
+    action = db.Column(db.String(100), nullable=False)  # e.g., 'role_added', 'role_removed', 'login', 'logout'
+    details = db.Column(db.JSON)  # Additional context about the action
+    ip_address = db.Column(db.String(45))  # IPv6 compatible
+    user_agent = db.Column(db.String(255))
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    admin_user = db.relationship("AdminUser", backref=db.backref("audit_logs", lazy="dynamic"))
+
+    def __repr__(self) -> str:
+        return f"<AuditLog {self.id} - {self.action}>"
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for API responses."""
+        return {
+            "id": self.id,
+            "admin_user_id": self.admin_user_id,
+            "admin_email": self.admin_user.email if self.admin_user else None,
+            "action": self.action,
+            "details": self.details,
+            "ip_address": self.ip_address,
+            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
+        }
+
+
 def nocache(view: Callable) -> Callable:
     @wraps(view)
     def no_cache(*args: Any, **kwargs: Any) -> Any:
@@ -78,6 +160,170 @@ def nocache(view: Callable) -> Callable:
         return response
 
     return update_wrapper(no_cache, view)
+
+
+def log_audit(admin_user: AdminUser | None, action: str, details: dict[str, Any] | None = None) -> None:
+    """Log an audit event for admin actions."""
+    audit_entry = AuditLog(
+        admin_user_id=admin_user.id if admin_user else None,
+        action=action,
+        details=details or {},
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get("User-Agent"),
+    )
+    db.session.add(audit_entry)
+    db.session.commit()
+
+
+def extract_claims_from_token(token: dict[str, Any]) -> dict[str, Any]:
+    """Extract relevant claims from OIDC token."""
+    return {
+        "sub": token.get("sub"),
+        "email": token.get("email"),
+        "email_verified": token.get("email_verified", False),
+        "name": token.get("name"),
+        "roles": token.get("roles", []),
+        "groups": token.get("groups", []),
+        "iss": token.get("iss"),
+        "aud": token.get("aud"),
+    }
+
+
+def map_claims_to_admin_roles(claims: dict[str, Any]) -> list[str]:
+    """Map OIDC claims to admin roles based on configuration.
+    
+    This function checks:
+    1. Explicit role claims (e.g., 'roles', 'groups')
+    2. Email whitelist for automatic admin access
+    3. Custom claim mappings
+    """
+    roles = []
+    
+    # Check explicit role claims
+    token_roles = claims.get("roles", [])
+    if isinstance(token_roles, str):
+        token_roles = [token_roles]
+    
+    admin_roles_config = app.config["OIDC_ADMIN_ROLES"]
+    for role in token_roles:
+        if role in admin_roles_config:
+            roles.append(role)
+    
+    # Check groups
+    token_groups = claims.get("groups", [])
+    if isinstance(token_groups, str):
+        token_groups = [token_groups]
+    
+    for group in token_groups:
+        # Map groups to roles (e.g., "admins" group -> "admin" role)
+        if group.lower() in ["admins", "administrators", "admin-group"]:
+            if "admin" not in roles:
+                roles.append("admin")
+        if group.lower() in ["superusers", "super-admins"]:
+            if "superuser" not in roles:
+                roles.append("superuser")
+    
+    # Check email whitelist
+    allowed_emails = app.config["OIDC_ALLOWED_EMAILS"]
+    email = claims.get("email")
+    if email and email in allowed_emails:
+        if "admin" not in roles:
+            roles.append("admin")
+    
+    return roles
+
+
+def get_or_create_admin_from_claims(claims: dict[str, Any]) -> AdminUser | None:
+    """Get existing admin user or create new one from OIDC claims."""
+    email = claims.get("email")
+    oidc_sub = claims.get("sub")
+    
+    if not email or not oidc_sub:
+        return None
+    
+    # Check if user exists
+    admin_user = AdminUser.query.filter_by(oidc_sub=oidc_sub).first()
+    
+    if admin_user:
+        # Update roles from claims
+        new_roles = map_claims_to_admin_roles(claims)
+        old_roles = admin_user.roles or []
+        
+        # Log role changes
+        added_roles = set(new_roles) - set(old_roles)
+        removed_roles = set(old_roles) - set(new_roles)
+        
+        if added_roles:
+            log_audit(admin_user, "roles_added", {"roles": list(added_roles)})
+        if removed_roles:
+            log_audit(admin_user, "roles_removed", {"roles": list(removed_roles)})
+        
+        admin_user.roles = new_roles
+        admin_user.email = email
+        admin_user.updated_at = datetime.utcnow()
+    else:
+        # Create new admin user
+        admin_user = AdminUser(
+            email=email,
+            oidc_sub=oidc_sub,
+            roles=map_claims_to_admin_roles(claims),
+        )
+        db.session.add(admin_user)
+        log_audit(admin_user, "user_created", {"claims": claims})
+    
+    db.session.commit()
+    return admin_user
+
+
+def admin_required(f: Callable) -> Callable:
+    """Decorator to require admin authentication via OIDC or fallback token."""
+    @wraps(f)
+    def decorated(*args: Any, **kwargs: Any) -> Any:
+        # Check for OIDC session
+        if "oidc_user" in session:
+            admin_user = AdminUser.query.get(session["oidc_user"]["id"])
+            if admin_user and admin_user.is_active and admin_user.roles:
+                # Update last login
+                admin_user.last_login = datetime.utcnow()
+                db.session.commit()
+                request.current_admin_user = admin_user
+                return f(*args, **kwargs)
+        
+        # Fallback to token-based auth (for backward compatibility)
+        auth_header = request.headers.get("Authorization")
+        expected_token = os.environ.get("ADMIN_TOKEN", "admin")
+        use_oidc_only = os.environ.get("OIDC_ONLY", "false").lower() == "true"
+        
+        if use_oidc_only and not app.config["OIDC_DISCOVERY_URL"]:
+            return make_response(
+                json.jsonify({
+                    "error": "Unauthorized",
+                    "message": "OIDC authentication required but not configured"
+                }),
+                401
+            )
+        
+        if not auth_header:
+            return make_response(
+                json.jsonify({
+                    "error": "Unauthorized",
+                    "message": "Missing Authorization header"
+                }),
+                401
+            )
+        
+        if auth_header != f"Bearer {expected_token}":
+            return make_response(
+                json.jsonify({
+                    "error": "Forbidden",
+                    "message": "Invalid token"
+                }),
+                403
+            )
+        
+        return f(*args, **kwargs)
+    
+    return decorated
 
 
 @app.route("/")
@@ -144,31 +390,143 @@ def send_img(this_uuid: str) -> Any:
     return send_file(img_io, download_name="1.png", mimetype="image/png")  # type: ignore[call-arg]
 
 
-def admin_required(
-    f: Callable,
-) -> Callable:
-    """Decorator to require admin authentication."""
+# ============================================================================
+# OIDC Authentication Endpoints
+# ============================================================================
 
-    @wraps(f)
-    def decorated(*args: Any, **kwargs: Any) -> Any:
-        auth_header = request.headers.get("Authorization")
+@app.route("/api/auth/login")
+def oidc_login() -> Any:
+    """Initiate OIDC login flow."""
+    if not app.config["OIDC_DISCOVERY_URL"]:
+        return json.jsonify({
+            "error": "OIDC not configured",
+            "message": "OIDC discovery URL not set"
+        }), 503
+    
+    redirect_uri = url_for("oidc_callback", _external=True)
+    return oauth.oidc.authorize_redirect(redirect_uri)
+
+
+@app.route("/api/auth/callback")
+def oidc_callback() -> Any:
+    """Handle OIDC callback after authentication."""
+    if not app.config["OIDC_DISCOVERY_URL"]:
+        return json.jsonify({
+            "error": "OIDC not configured",
+            "message": "OIDC discovery URL not set"
+        }), 503
+    
+    try:
+        token = oauth.oidc.authorize_access_token()
+    except Exception as e:
+        app.logger.error(f"OIDC token exchange failed: {e}")
+        return json.jsonify({
+            "error": "Authentication failed",
+            "message": "Could not complete OIDC authentication"
+        }), 400
+    
+    # Extract claims from token
+    claims = extract_claims_from_token(token.get("userinfo", token))
+    
+    # Validate email
+    email = claims.get("email")
+    if not email:
+        return json.jsonify({
+            "error": "Unauthorized",
+            "message": "Email claim not found in token"
+        }), 403
+    
+    # Check email whitelist if configured
+    allowed_emails = app.config["OIDC_ALLOWED_EMAILS"]
+    if allowed_emails and email not in allowed_emails:
+        log_audit(None, "login_denied", {"email": email, "reason": "email_not_whitelisted"})
+        return json.jsonify({
+            "error": "Forbidden",
+            "message": "Email not in allowed list"
+        }), 403
+    
+    # Map claims to admin roles and get/create user
+    admin_user = get_or_create_admin_from_claims(claims)
+    
+    if not admin_user or not admin_user.roles:
+        log_audit(admin_user, "login_denied", {"email": email, "reason": "no_admin_roles"})
+        return json.jsonify({
+            "error": "Forbidden",
+            "message": "User does not have admin roles"
+        }), 403
+    
+    # Store user in session
+    session["oidc_user"] = {
+        "id": admin_user.id,
+        "email": admin_user.email,
+        "roles": admin_user.roles,
+    }
+    
+    # Update last login
+    admin_user.last_login = datetime.utcnow()
+    db.session.commit()
+    
+    # Log successful login
+    log_audit(admin_user, "login", {"claims": claims})
+    
+    # Redirect to dashboard or return JSON for API clients
+    if request.headers.get("Accept") == "application/json":
+        return json.jsonify({
+            "status": "authenticated",
+            "user": admin_user.to_dict(),
+        }), 200
+    
+    return redirect("/admin/dashboard")
+
+
+@app.route("/api/auth/logout", methods=["POST", "GET"])
+def oidc_logout() -> Any:
+    """Logout and clear session."""
+    admin_user = None
+    if "oidc_user" in session:
+        admin_user = AdminUser.query.get(session["oidc_user"]["id"])
+        if admin_user:
+            log_audit(admin_user, "logout", {})
+    
+    session.clear()
+    
+    if request.headers.get("Accept") == "application/json":
+        return json.jsonify({"status": "logged_out"}), 200
+    
+    return redirect("/")
+
+
+@app.route("/api/auth/me")
+def get_current_user() -> Any:
+    """Get current authenticated user info."""
+    if "oidc_user" in session:
+        admin_user = AdminUser.query.get(session["oidc_user"]["id"])
+        if admin_user:
+            return json.jsonify({
+                "authenticated": True,
+                "user": admin_user.to_dict(),
+            }), 200
+    
+    # Check for token auth
+    auth_header = request.headers.get("Authorization")
+    if auth_header:
         expected_token = os.environ.get("ADMIN_TOKEN", "admin")
+        if auth_header == f"Bearer {expected_token}":
+            return json.jsonify({
+                "authenticated": True,
+                "user": {
+                    "email": "token-admin",
+                    "roles": ["admin"],
+                    "auth_type": "token",
+                },
+            }), 200
+    
+    return json.jsonify({"authenticated": False}), 401
 
-        if not auth_header:
-            return make_response(
-                {"error": "Unauthorized", "message": "Missing Authorization header"},
-                401,
-            )
 
-        if auth_header != f"Bearer {expected_token}":
-            return make_response(
-                {"error": "Forbidden", "message": "Invalid token"}, 403
-            )
-
-        return f(*args, **kwargs)
-
-    return decorated
-
+# ============================================================================
+# Legacy Token Authentication (for backward compatibility)
+# ============================================================================
 
 @app.route("/api/admin/login", methods=["POST"])
 def admin_login() -> Any:
@@ -177,11 +535,26 @@ def admin_login() -> Any:
     token = data.get("token")
 
     admin_token = os.environ.get("ADMIN_TOKEN", "admin")
+    use_oidc_only = os.environ.get("OIDC_ONLY", "false").lower() == "true"
+    
+    if use_oidc_only and app.config["OIDC_DISCOVERY_URL"]:
+        return json.jsonify({
+            "error": "Token auth disabled",
+            "message": "OIDC-only mode enabled. Use /api/auth/login"
+        }), 403
 
     if token == admin_token:
-        return json.jsonify({"status": "authenticated"}), 200
+        log_audit(None, "token_login", {"method": "token"})
+        return json.jsonify({
+            "status": "authenticated",
+            "auth_type": "token",
+        }), 200
     return json.jsonify({"error": "Invalid token"}), 401
 
+
+# ============================================================================
+# OIDC Token Endpoints (for OIDC provider integration)
+# ============================================================================
 
 @app.route("/api/admin/oidc/login", methods=["POST"])
 def admin_oidc_login() -> Any:
@@ -225,6 +598,153 @@ def admin_protected() -> Any:
         }
     ), 200
 
+
+# ============================================================================
+# Admin User Management Endpoints
+# ============================================================================
+
+@app.route("/api/admin/users", methods=["GET"])
+@admin_required
+def get_admin_users() -> Any:
+    """Get all admin users."""
+    users = AdminUser.query.all()
+    return json.jsonify({
+        "users": [user.to_dict() for user in users],
+        "total": len(users),
+    }), 200
+
+
+@app.route("/api/admin/users/<int:user_id>", methods=["GET"])
+@admin_required
+def get_admin_user(user_id: int) -> Any:
+    """Get a specific admin user."""
+    user = AdminUser.query.get_or_404(user_id)
+    return json.jsonify(user.to_dict()), 200
+
+
+@app.route("/api/admin/users/<int:user_id>/roles", methods=["PUT"])
+@admin_required
+def update_admin_user_roles(user_id: int) -> Any:
+    """Update admin user roles."""
+    user = AdminUser.query.get_or_404(user_id)
+    data = request.get_json()
+    
+    if not data or "roles" not in data:
+        return json.jsonify({"error": "roles field required"}), 400
+    
+    new_roles = data["roles"]
+    if not isinstance(new_roles, list):
+        return json.jsonify({"error": "roles must be a list"}), 400
+    
+    old_roles = user.roles or []
+    added_roles = set(new_roles) - set(old_roles)
+    removed_roles = set(old_roles) - set(new_roles)
+    
+    # Prevent removing all roles from last admin
+    if not new_roles:
+        admin_count = AdminUser.query.filter(
+            AdminUser.roles != [],
+            AdminUser.is_active == True
+        ).count()
+        if admin_count <= 1:
+            return json.jsonify({
+                "error": "Cannot remove all roles from last admin"
+            }), 400
+    
+    user.roles = new_roles
+    user.updated_at = datetime.utcnow()
+    db.session.commit()
+    
+    # Log the changes
+    current_admin = getattr(request, 'current_admin_user', None)
+    if added_roles:
+        log_audit(current_admin, "roles_added_by_admin", {
+            "target_user": user.email,
+            "roles": list(added_roles),
+        })
+    if removed_roles:
+        log_audit(current_admin, "roles_removed_by_admin", {
+            "target_user": user.email,
+            "roles": list(removed_roles),
+        })
+    
+    return json.jsonify(user.to_dict()), 200
+
+
+@app.route("/api/admin/users/<int:user_id>/activate", methods=["POST"])
+@admin_required
+def activate_admin_user(user_id: int) -> Any:
+    """Activate an admin user."""
+    user = AdminUser.query.get_or_404(user_id)
+    user.is_active = True
+    user.updated_at = datetime.utcnow()
+    db.session.commit()
+    
+    log_audit(getattr(request, 'current_admin_user', None), "user_activated", {
+        "target_user": user.email
+    })
+    
+    return json.jsonify(user.to_dict()), 200
+
+
+@app.route("/api/admin/users/<int:user_id>/deactivate", methods=["POST"])
+@admin_required
+def deactivate_admin_user(user_id: int) -> Any:
+    """Deactivate an admin user."""
+    user = AdminUser.query.get_or_404(user_id)
+    
+    # Prevent deactivating last admin
+    admin_count = AdminUser.query.filter(
+        AdminUser.roles != [],
+        AdminUser.is_active == True,
+        AdminUser.id != user_id
+    ).count()
+    if admin_count == 0:
+        return json.jsonify({
+            "error": "Cannot deactivate last active admin"
+        }), 400
+    
+    user.is_active = False
+    user.updated_at = datetime.utcnow()
+    db.session.commit()
+    
+    log_audit(getattr(request, 'current_admin_user', None), "user_deactivated", {
+        "target_user": user.email
+    })
+    
+    return json.jsonify(user.to_dict()), 200
+
+
+@app.route("/api/admin/audit-logs", methods=["GET"])
+@admin_required
+def get_audit_logs() -> Any:
+    """Get audit logs with optional filtering."""
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 50, type=int)
+    action = request.args.get("action")
+    user_id = request.args.get("user_id", type=int)
+    
+    query = AuditLog.query.order_by(AuditLog.timestamp.desc())
+    
+    if action:
+        query = query.filter_by(action=action)
+    if user_id:
+        query = query.filter_by(admin_user_id=user_id)
+    
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    
+    return json.jsonify({
+        "logs": [log.to_dict() for log in pagination.items],
+        "total": pagination.total,
+        "pages": pagination.pages,
+        "current_page": page,
+        "per_page": per_page,
+    }), 200
+
+
+# ============================================================================
+# Legacy Admin Endpoints (now protected with admin_required)
+# ============================================================================
 
 @app.route("/api/admin/recipients", methods=["GET"])
 @admin_required

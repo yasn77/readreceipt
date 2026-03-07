@@ -14,6 +14,10 @@ bleach==6.2.0
 PyJWT==2.10.1
 cryptography==45.0.5
 
+# OIDC Authentication
+Authlib==1.5.1
+requests==2.32.5
+
 # Testing
 pytest==9.0.2
 pytest-cov==7.0.0
