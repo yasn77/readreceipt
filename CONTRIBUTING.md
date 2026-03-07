@@ -11,41 +11,28 @@ git clone https://github.com/yasn77/readreceipt.git
 cd readreceipt
 ```
 
-### 2. Set Up Python Environment
+### 2. Set Up Environment with mise
 
-We use `mise` for environment management:
+We use `mise` for development environment management. It automatically manages Python, Node.js, and all required tools.
 
 ```bash
-# Install mise
+# Install mise (if not already installed)
 curl https://mise.run | sh
 
-# Install Python
-mise use python@3.11
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
+# Install all tools and dependencies
+mise install
 ```
 
-### 3. Set Up Node.js Environment
+This will:
+- Install Python 3.11 and Node.js 20
+- Set up a virtual environment using `uv`
+- Install all Python dependencies
+- Install all frontend dependencies
+
+### 3. Install Pre-commit Hooks
 
 ```bash
-# Install Node.js via mise
-mise use node@20
-
-# Install admin dashboard dependencies
-cd admin-dashboard
-npm install
-```
-
-### 4. Install Pre-commit Hooks
-
-```bash
-pip install pre-commit
-pre-commit install
+mise run hooks
 ```
 
 ## Code Style
@@ -59,13 +46,12 @@ pre-commit install
 - Write docstrings for public functions and classes
 
 ```bash
-# Lint
+# Lint with mise
+mise run lint
+
+# Or run individual tools
 ruff check .
-
-# Format
 black .
-
-# Type check
 mypy .
 ```
 
@@ -81,12 +67,36 @@ cd admin-dashboard
 npm run lint
 ```
 
+## mise Tasks
+
+We use `mise` to manage our development workflow. Here are the available tasks:
+
+### Core Tasks
+
+- `mise run install` - Install all dependencies (backend + frontend)
+- `mise run dev` - Run backend development server
+- `mise run dev-frontend` - Run frontend development server
+- `mise run test` - Run tests with pytest
+- `mise run lint` - Run linters (ruff, black, mypy)
+- `mise run build` - Build frontend (admin-dashboard)
+- `mise run clean` - Clean build artifacts and cache
+
+### Additional Tasks
+
+- `mise run format` - Format code with black
+- `mise run hooks` - Run pre-commit hooks on all files
+- `mise run security` - Run security scans (bandit, safety)
+- `mise run ci` - Run full CI pipeline (lint + test + build)
+
 ## Testing
 
 ### Running Tests
 
 ```bash
-# Backend tests
+# Backend tests (using mise)
+mise run test
+
+# Or directly with pytest
 pytest
 
 # Frontend tests
@@ -126,7 +136,30 @@ git checkout -b refactor/description
 - Update documentation if needed
 - Run pre-commit hooks
 
-### 3. Commit Messages
+### 3. Sign-Off Your Commits
+
+We require all commits to be signed off using the Developer Certificate of Origin (DCO). By signing off, you certify that you have the right to submit the code under the project's license.
+
+Add the `-s` or `--signoff` flag to your commit command:
+
+```bash
+git commit -s -m "feat: Add analytics endpoint for geographic data"
+```
+
+This adds a `Signed-off-by` line to the commit message:
+
+```
+feat: Add analytics endpoint for geographic data
+
+Signed-off-by: Your Name <your.email@example.com>
+```
+
+**Why sign-off?**
+- Confirms you wrote the code or have the right to submit it
+- Ensures contributions can be legally included in the project
+- Follows industry best practices (Linux kernel, Kubernetes, etc.)
+
+### 4. Commit Messages
 
 Follow conventional commits:
 
@@ -142,30 +175,75 @@ chore: Update dependencies
 
 Example:
 ```bash
-git commit -m "feat: Add analytics endpoint for geographic data"
+git commit -s -m "feat: Add analytics endpoint for geographic data"
 ```
 
-### 4. Open a Pull Request
+### 5. Open a Pull Request
 
 1. Push to your branch: `git push origin feature/description`
 2. Navigate to the repository on GitHub
 3. Click "New Pull Request"
 4. Select your branch
 5. Fill in the PR template
+6. Ensure your PR references the relevant issue (e.g., `Fixes #123`)
 
-### 5. PR Requirements
+### 6. PR Requirements
 
+Before your PR can be merged, it must meet the following requirements:
+
+**Code Quality:**
 - [ ] All tests pass
-- [ ] Coverage >90%
+- [ ] Coverage >90% (enforced in CI)
 - [ ] CI pipeline succeeds
-- [ ] Code reviewed and approved
-- [ ] Documentation updated
+- [ ] Code follows project style guidelines
+- [ ] No linting errors or warnings
 
-### 6. Review Process
+**Documentation:**
+- [ ] README.md updated (if user-facing changes)
+- [ ] API documentation updated (if new endpoints)
+- [ ] Docstrings added/updated for new functions
+- [ ] Changelog updated (if applicable)
 
-- A reviewer will review your code
-- Address any comments or suggestions
-- Once approved, the PR will be merged
+**Process:**
+- [ ] All commits are signed off (`-s` flag)
+- [ ] PR description is clear and complete
+- [ ] Related issue is referenced
+- [ ] Breaking changes are documented
+
+### 7. Approval Criteria
+
+See [governance.md](governance.md) for detailed approval criteria. Briefly:
+
+**Definition of Done:**
+1. ✅ Code Complete: All required code written and syntactically correct
+2. ✅ Unit Tests Pass: All relevant tests passing
+3. ✅ Integration Tests Pass: Applicable integration tests passing
+4. ✅ Acceptance Criteria Met: All acceptance criteria satisfied
+5. ✅ Two-Eye Review: Code reviewed by at least one other developer
+6. ✅ Documentation Updated: All necessary documentation updated
+7. ✅ No Regressions: Existing functionality unaffected
+8. ✅ CI/CD Success: All automated checks passing
+
+**Review Process:**
+- A reviewer will review your code within 3-5 business days
+- Address all review comments and suggestions
+- Request re-review after making changes
+- Once approved and all criteria met, the PR will be merged
+
+**Approver Responsibilities:**
+- Verify code meets Definition of Done
+- Check code quality, maintainability, and adherence to standards
+- Ensure solution is appropriate for the problem
+- Provide constructive, actionable feedback
+- Approve only when satisfied with the changes
+
+### 8. Merge Process
+
+Once your PR is approved:
+1. Maintainer will squash and merge your commits
+2. Branch will be deleted automatically
+3. Changes will be deployed to staging (if applicable)
+4. You'll be notified when merged
 
 ## Issue Reporting
 
@@ -218,5 +296,17 @@ All PRs trigger the CI pipeline:
 ## Questions?
 
 Feel free to open an issue with the "question" label for any questions about contributing.
+
+## Code of Conduct
+
+This project adheres to a Code of Conduct that all contributors must follow. By participating, you are expected to uphold this code.
+
+Please read the full [Code of Conduct](CODE_OF_CONDUCT.md) for details.
+
+**Summary:**
+- Be respectful and inclusive
+- Welcome newcomers and help them learn
+- Focus on constructive feedback
+- Report unacceptable behavior to maintainers
 
 Thank you for your contributions! 🎉

@@ -6,6 +6,8 @@
 
 A comprehensive email read receipt tracking system with a Flask backend, React admin dashboard, and browser extensions for Gmail and other webmail services.
 
+**📚 [Documentation](docs/)** | **📘 [Usage Guide](docs/usage.md)** | **🤝 [Contributing](CONTRIBUTING.md)** | **📋 [Code of Conduct](CODE_OF_CONDUCT.md)**
+
 ## Features
 
 - 📧 **Email Tracking** - Track when recipients open your emails via invisible tracking pixels
@@ -20,48 +22,54 @@ A comprehensive email read receipt tracking system with a Flask backend, React a
 
 ### Prerequisites
 
-- Python 3.11+
-- Node.js 18+
-- PostgreSQL (optional, SQLite for development)
+- [mise](https://mise.jdx.dev/) - Development environment manager
 - Chrome or Firefox browser
 
-### Backend Setup
+### Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/yasn77/readreceipt.git
 cd readreceipt
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Install mise (if not already installed)
+curl https://mise.run | sh
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Set environment variables
-export SQLALCHEMY_DATABASE_URI=sqlite:///db.sqlite3
-export ADMIN_TOKEN=your-secure-token
-
-# Run the application
-python app.py
+# Install tools and dependencies with mise
+mise install
 ```
 
-The server will start on `http://localhost:5000`.
+This will:
+- Install Python 3.11 and Node.js 20
+- Set up a virtual environment using `uv`
+- Install all Python dependencies
+- Install all frontend dependencies
 
-### Admin Dashboard Setup
+### Development
 
 ```bash
-cd admin-dashboard
+# Start the backend development server
+mise run dev
 
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
+# In another terminal, start the admin dashboard
+mise run dev-frontend
 ```
 
-The dashboard will be available at `http://localhost:3000`.
+The backend will be available at `http://localhost:5000` and the dashboard at `http://localhost:3000`.
+
+### Available mise Tasks
+
+- `mise run install` - Install all dependencies (backend + frontend)
+- `mise run dev` - Run backend development server
+- `mise run dev-frontend` - Run frontend development server
+- `mise run test` - Run tests with pytest
+- `mise run lint` - Run linters (ruff, black, mypy)
+- `mise run format` - Format code with black
+- `mise run build` - Build frontend (admin-dashboard)
+- `mise run clean` - Clean build artifacts and cache
+- `mise run hooks` - Run pre-commit hooks
+- `mise run security` - Run security scans (bandit, safety)
+- `mise run ci` - Run full CI pipeline (lint + test + build)
 
 ### Browser Extension
 
@@ -131,7 +139,10 @@ cp .env.example .env
 ### Backend Tests
 
 ```bash
-# Run all tests with coverage
+# Run all tests with coverage (using mise)
+mise run test
+
+# Or directly with pytest
 pytest
 
 # Run specific test file
@@ -155,26 +166,22 @@ npm test -- --coverage
 
 ## Development
 
-### Pre-commit Hooks
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development guidelines.
 
-Install pre-commit hooks for automatic linting:
-
-```bash
-pip install pre-commit
-pre-commit install
-```
-
-### Code Quality
+### Quick Commands
 
 ```bash
-# Lint code
-ruff check .
+# Run all linters
+mise run lint
 
 # Format code
-black .
+mise run format
 
-# Type check
-mypy .
+# Run pre-commit hooks
+mise run hooks
+
+# Run security scans
+mise run security
 ```
 
 ## Project Structure
@@ -232,11 +239,11 @@ helm install readreceipt ./helm --set adminToken=your-token
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
+3. Commit your changes with sign-off (`git commit -s -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines and [docs/](docs/) for comprehensive documentation.
 
 ## License
 

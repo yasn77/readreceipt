@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import csv
 import io
 import os
 import uuid
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import update_wrapper, wraps
+from io import StringIO
 from typing import Any
 
 from flask import Flask, json, make_response, request, send_file
@@ -14,6 +16,9 @@ from flask_sqlalchemy import SQLAlchemy
 from PIL import Image
 from sqlalchemy_utils import CountryType, IPAddressType
 from ua_parser import user_agent_parser
+
+# Import OIDC provider
+from oidc_provider import OIDCProvider, jwt_verification_required, validate_token
 
 app = Flask(__name__)
 # app.config ['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'
@@ -24,6 +29,17 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+
+# Initialise OIDC provider
+oidc = OIDCProvider(app)
+
+# Register a demo OIDC client (for testing/development)
+oidc.register_client(
+    client_id="readreceipt-admin",
+    client_secret=os.environ.get("OIDC_CLIENT_SECRET", "admin-secret"),
+    redirect_uris=["http://localhost:3000/callback", "http://localhost:8080/callback"],
+    grant_types=["authorization_code", "refresh_token"],
+)
 
 
 class Recipients(db.Model):  # type: ignore[name-defined]
@@ -54,9 +70,9 @@ def nocache(view: Callable) -> Callable:
     def no_cache(*args: Any, **kwargs: Any) -> Any:
         response = make_response(view(*args, **kwargs))
         response.headers["Last-Modified"] = datetime.now()
-        response.headers[
-            "Cache-Control"
-        ] = "no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0"
+        response.headers["Cache-Control"] = (
+            "no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0"
+        )
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "-1"
         return response
@@ -128,6 +144,32 @@ def send_img(this_uuid: str) -> Any:
     return send_file(img_io, download_name="1.png", mimetype="image/png")  # type: ignore[call-arg]
 
 
+def admin_required(
+    f: Callable,
+) -> Callable:
+    """Decorator to require admin authentication."""
+
+    @wraps(f)
+    def decorated(*args: Any, **kwargs: Any) -> Any:
+        auth_header = request.headers.get("Authorization")
+        expected_token = os.environ.get("ADMIN_TOKEN", "admin")
+
+        if not auth_header:
+            return make_response(
+                {"error": "Unauthorized", "message": "Missing Authorization header"},
+                401,
+            )
+
+        if auth_header != f"Bearer {expected_token}":
+            return make_response(
+                {"error": "Forbidden", "message": "Invalid token"}, 403
+            )
+
+        return f(*args, **kwargs)
+
+    return decorated
+
+
 @app.route("/api/admin/login", methods=["POST"])
 def admin_login() -> Any:
     """Admin login endpoint with token authentication."""
@@ -141,7 +183,51 @@ def admin_login() -> Any:
     return json.jsonify({"error": "Invalid token"}), 401
 
 
+@app.route("/api/admin/oidc/login", methods=["POST"])
+def admin_oidc_login() -> Any:
+    """Admin login endpoint with OIDC token authentication."""
+    data = request.get_json()
+    access_token = data.get("access_token")
+
+    if not access_token:
+        return json.jsonify({"error": "access_token is required"}), 400
+
+    # Validate the OIDC token
+    payload = validate_token(access_token, oidc)
+    if payload is None:
+        return json.jsonify({"error": "Invalid or expired token"}), 401
+
+    return json.jsonify(
+        {
+            "status": "authenticated",
+            "user": {
+                "sub": payload.get("sub"),
+                "scope": payload.get("scope"),
+            },
+        }
+    ), 200
+
+
+@app.route("/api/admin/protected", methods=["GET"])
+@jwt_verification_required(oidc)
+def admin_protected() -> Any:
+    """Protected admin endpoint requiring valid OIDC token."""
+    # Access the decoded JWT payload from request context
+    payload = request.oidc_payload  # type: ignore[attr-defined]
+    return json.jsonify(
+        {
+            "status": "access_granted",
+            "message": "Welcome to the protected area",
+            "user": {
+                "sub": payload.get("sub"),
+                "scope": payload.get("scope"),
+            },
+        }
+    ), 200
+
+
 @app.route("/api/admin/recipients", methods=["GET"])
+@admin_required
 def get_recipients() -> Any:
     """Get all recipients."""
     recipients = Recipients.query.all()
@@ -162,6 +248,7 @@ def get_recipients() -> Any:
 
 
 @app.route("/api/admin/recipients", methods=["POST"])
+@admin_required
 def create_recipient() -> Any:
     """Create a new recipient."""
     data = request.get_json()
@@ -191,6 +278,7 @@ def create_recipient() -> Any:
 
 
 @app.route("/api/admin/recipients/<int:recipient_id>", methods=["PUT"])
+@admin_required
 def update_recipient(recipient_id: int) -> Any:
     """Update a recipient."""
     recipient = Recipients.query.get_or_404(recipient_id)
@@ -217,6 +305,7 @@ def update_recipient(recipient_id: int) -> Any:
 
 
 @app.route("/api/admin/recipients/<int:recipient_id>", methods=["DELETE"])
+@admin_required
 def delete_recipient(recipient_id: int) -> Any:
     """Delete a recipient."""
     recipient = Recipients.query.get_or_404(recipient_id)
@@ -227,12 +316,11 @@ def delete_recipient(recipient_id: int) -> Any:
 
 
 @app.route("/api/admin/stats", methods=["GET"])
+@admin_required
 def get_admin_stats() -> Any:
     """Get dashboard statistics."""
     total_recipients = Recipients.query.count()
     total_events = Tracking.query.count()
-
-    from datetime import datetime, timedelta
 
     yesterday = datetime.now() - timedelta(days=1)
     events_today = Tracking.query.filter(Tracking.timestamp >= yesterday).count()
@@ -262,6 +350,7 @@ def get_admin_stats() -> Any:
 
 
 @app.route("/api/admin/settings", methods=["GET"])
+@admin_required
 def get_settings() -> Any:
     """Get application settings."""
     return (
@@ -277,6 +366,7 @@ def get_settings() -> Any:
 
 
 @app.route("/api/admin/settings", methods=["PUT"])
+@admin_required
 def update_settings() -> Any:
     """Update application settings (in-memory for now)."""
     data = request.get_json()
@@ -284,12 +374,11 @@ def update_settings() -> Any:
 
 
 @app.route("/api/analytics/summary", methods=["GET"])
+@admin_required
 def get_analytics_summary() -> Any:
     """Get analytics summary."""
     total_events = Tracking.query.count()
     unique_recipients = Tracking.query.distinct(Tracking.recipients_id).count()
-
-    from datetime import datetime, timedelta
 
     last_week = datetime.now() - timedelta(days=7)
     events_last_week = Tracking.query.filter(Tracking.timestamp >= last_week).count()
@@ -316,10 +405,9 @@ def get_analytics_summary() -> Any:
 
 
 @app.route("/api/analytics/events", methods=["GET"])
+@admin_required
 def get_analytics_events() -> Any:
     """Get time-series event data."""
-    from datetime import datetime, timedelta
-
     range_days = request.args.get("range", "7d")
     days = int(range_days.replace("d", ""))
     start_date = datetime.now() - timedelta(days=days)
@@ -344,6 +432,7 @@ def get_analytics_events() -> Any:
 
 
 @app.route("/api/analytics/recipients", methods=["GET"])
+@admin_required
 def get_analytics_recipients() -> Any:
     """Get top recipients by opens."""
     top_recipients = (
@@ -363,6 +452,7 @@ def get_analytics_recipients() -> Any:
 
 
 @app.route("/api/analytics/geo", methods=["GET"])
+@admin_required
 def get_analytics_geo() -> Any:
     """Get geographic distribution."""
     geo_data = (
@@ -383,6 +473,7 @@ def get_analytics_geo() -> Any:
 
 
 @app.route("/api/analytics/clients", methods=["GET"])
+@admin_required
 def get_analytics_clients() -> Any:
     """Get email client breakdown."""
     events = Tracking.query.all()
@@ -425,11 +516,9 @@ def get_analytics_clients() -> Any:
 
 
 @app.route("/api/analytics/export", methods=["GET"])
+@admin_required
 def export_analytics() -> Any:
     """Export analytics data as CSV."""
-    import csv
-    from io import StringIO
-
     events = Tracking.query.all()
 
     output = StringIO()
