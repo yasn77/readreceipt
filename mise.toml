@@ -1,0 +1,95 @@
+[tools]
+python = "3.11"
+node = "20"
+uv = "latest"
+npm = "latest"
+
+[settings.python]
+uv_venv_auto = true
+
+[tasks]
+# Install all dependencies (backend + frontend)
+install = { run = """
+echo "Installing backend dependencies..."
+uv pip install -r requirements.txt --system
+echo "Installing frontend dependencies..."
+cd admin-dashboard && npm install
+echo "All dependencies installed successfully!"
+""", description = "Install all dependencies (backend + frontend)" }
+
+# Run tests with pytest
+test = { run = """
+echo "Running backend tests..."
+pytest
+""", description = "Run tests with pytest" }
+
+# Run linters (ruff, black, mypy)
+lint = { run = """
+echo "Running ruff..."
+ruff check .
+echo "Running black (check mode)..."
+black --check .
+echo "Running mypy..."
+mypy .
+echo "All linters passed!"
+""", description = "Run linters (ruff, black, mypy)" }
+
+# Run development server
+dev = { run = """
+echo "Starting Flask development server..."
+python app.py
+""", description = "Run development server" }
+
+# Run frontend development server
+dev-frontend = { run = """
+echo "Starting admin dashboard dev server..."
+cd admin-dashboard && npm run dev
+""", description = "Run frontend development server" }
+
+# Build frontend
+build = { run = """
+echo "Building admin dashboard..."
+cd admin-dashboard && npm run build
+echo "Build complete!"
+""", description = "Build frontend (admin-dashboard)" }
+
+# Clean build artifacts and venv
+clean = { run = """
+echo "Cleaning Python cache..."
+find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+find . -type d -name .pytest_cache -exec rm -rf {} + 2>/dev/null || true
+find . -type d -name .mypy_cache -exec rm -rf {} + 2>/dev/null || true
+rm -rf .coverage htmlcov/
+echo "Cleaning frontend build artifacts..."
+rm -rf admin-dashboard/dist/ admin-dashboard/build/
+echo "Clean complete!"
+""", description = "Clean build artifacts and cache" }
+
+# Format code
+format = { run = """
+echo "Formatting code with black..."
+black .
+echo "Code formatted!"
+""", description = "Format code with black" }
+
+# Run pre-commit hooks
+hooks = { run = """
+echo "Running pre-commit hooks..."
+pre-commit run --all-files
+""", description = "Run pre-commit hooks" }
+
+# Run security scans
+security = { run = """
+echo "Running bandit security scan..."
+bandit -r .
+echo "Running safety dependency check..."
+safety check
+echo "Security scan complete!"
+""", description = "Run security scans (bandit, safety)" }
+
+# Full CI pipeline
+ci = { run = """
+mise run lint
+mise run test
+mise run build
+""", description = "Run full CI pipeline (lint + test + build)" }
