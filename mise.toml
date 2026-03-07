@@ -8,13 +8,13 @@ npm = "latest"
 uv_venv_auto = "create|source"
 
 [env]
-_.python.venv = { path = ".venv", create = true, uv_create_args = ['--seed'] }
+_.python.venv = { path = ".venv", create = true, uv_create_args = ["--seed"] }
 
 [tasks]
 # Install all dependencies (backend + frontend)
 install = { run = """
 echo "Installing backend dependencies..."
-uv pip install -r requirements.txt --system
+uv pip install -r requirements.txt
 echo "Installing frontend dependencies..."
 cd admin-dashboard && npm install
 echo "All dependencies installed successfully!"
@@ -40,7 +40,7 @@ echo "All linters passed!"
 # Run development server
 dev = { run = """
 echo "Starting Flask development server..."
-python app.py
+.venv/bin/python app.py
 """, description = "Run development server" }
 
 # Run frontend development server
@@ -96,3 +96,4 @@ mise run lint
 mise run test
 mise run build
 """, description = "Run full CI pipeline (lint + test + build)" }
+
