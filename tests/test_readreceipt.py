@@ -122,6 +122,99 @@ class TestTracking:
             assert repr(tracking).startswith("<Tracking")
 
 
+class TestCookieBasedFiltering:
+    """Tests for Issue #150 - Cookie-based own-open filtering."""
+
+    def test_tracking_skipped_with_cookie(self) -> None:
+        """Test that tracking is skipped when rr_ignore_me cookie is present."""
+        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
+        app.config["TESTING"] = True
+        
+        with app.test_client() as client:
+            with app.app_context():
+                db.create_all()
+                # Create sample recipient
+                import uuid
+                test_uuid = str(uuid.uuid4())
+                recipient = Recipients(
+                    r_uuid=test_uuid, description="Test", email="test@example.com"
+                )
+                db.session.add(recipient)
+                db.session.commit()
+            
+            # Set cookie on client (Flask 3.x API) - use local.test for test client
+            client.set_cookie("rr_ignore_me", "true", domain="local.test")
+            
+            # Make request with cookie - specify SERVER_NAME to match domain
+            response = client.get(
+                f"/img/{test_uuid}",
+                headers={"User-Agent": "Mozilla/5.0 Test Browser"},
+                base_url="http://local.test",
+            )
+            assert response.status_code == 200
+            assert response.content_type == "image/png"
+
+            # Verify NO tracking was recorded
+            with app.app_context():
+                tracking_count = Tracking.query.count()
+                assert tracking_count == 0, "Tracking should be skipped when cookie is present"
+
+    def test_tracking_recorded_without_cookie(self) -> None:
+        """Test that tracking is recorded when rr_ignore_me cookie is NOT present."""
+        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
+        app.config["TESTING"] = True
+        
+        with app.test_client() as client:
+            with app.app_context():
+                db.create_all()
+                # Create sample recipient
+                import uuid
+                test_uuid = str(uuid.uuid4())
+                recipient = Recipients(
+                    r_uuid=test_uuid, description="Test", email="test@example.com"
+                )
+                db.session.add(recipient)
+                db.session.commit()
+            
+            # Make request without setting cookie
+            response = client.get(
+                f"/img/{test_uuid}",
+                headers={"User-Agent": "Mozilla/5.0 Test Browser"},
+                base_url="http://local.test",
+            )
+            assert response.status_code == 200
+
+            # Verify tracking WAS recorded
+            with app.app_context():
+                tracking_count = Tracking.query.count()
+                assert tracking_count == 1, "Tracking should be recorded when cookie is absent"
+
+    def test_set_ignore_cookie_endpoint(self, client: Any) -> None:
+        """Test the /api/cookie/set endpoint."""
+        response = client.post("/api/cookie/set")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["status"] == "cookie_set"
+        assert "rr_ignore_me" in response.headers.get("Set-Cookie", "")
+
+    def test_clear_ignore_cookie_endpoint(self, client: Any) -> None:
+        """Test the /api/cookie/clear endpoint."""
+        response = client.post("/api/cookie/clear")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["status"] == "cookie_cleared"
+        # Cookie should be cleared (max_age=0)
+        assert "rr_ignore_me" in response.headers.get("Set-Cookie", "")
+        assert "Max-Age=0" in response.headers.get("Set-Cookie", "")
+
+    def test_settings_includes_cookie_filtering(self, client: Any) -> None:
+        """Test that settings endpoint includes cookie_filtering_enabled."""
+        response = client.get("/api/admin/settings", headers=auth_headers())
+        assert response.status_code == 200
+        data = response.get_json()
+        assert "cookie_filtering_enabled" in data
+
+
 class TestAdminEndpoints:
     """Tests for admin API endpoints."""
 

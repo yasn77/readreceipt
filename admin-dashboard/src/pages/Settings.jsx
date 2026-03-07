@@ -78,6 +78,24 @@ function Settings() {
               </div>
 
               <div>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={cookieSetting}
+                    onChange={(e) => handleCookieToggle(e.target.checked)}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">
+                    Ignore my own opens (cookie-based filtering)
+                  </span>
+                </label>
+                <p className="ml-6 mt-1 text-xs text-gray-500">
+                  Sets a cookie to prevent tracking when you view your sent folder.
+                  This helps avoid false positives from your own email opens.
+                </p>
+              </div>
+
+              <div>
                 <label htmlFor="allowed_domains" className="block text-sm font-medium text-gray-700">
                   Allowed Domains (comma-separated)
                 </label>
