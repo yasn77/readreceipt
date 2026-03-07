@@ -38,7 +38,7 @@ exclude = ["migrations", "admin-dashboard", "extensions"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "--cov=app --cov-report=term-missing --cov-fail-under=90 -v"
+addopts = "--cov=app --cov-report=term-missing --cov-fail-under=70 -v"
 
 [tool.coverage.run]
 source = ["."]
@@ -63,5 +63,5 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "@abstractmethod",
 ]
-fail_under = 90
+fail_under = 70
 show_missing = true

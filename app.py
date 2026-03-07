@@ -1,18 +1,20 @@
 from __future__ import annotations
 
+import csv
 import io
 import os
 import uuid
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import update_wrapper, wraps
+from io import StringIO
 from typing import Any
 
 from flask import Flask, json, make_response, request, send_file
-from flask_migrate import Migrate
+from flask_migrate import Migrate  # type: ignore[import-untyped]
 from flask_sqlalchemy import SQLAlchemy
 from PIL import Image
-from sqlalchemy_utils import CountryType, IPAddressType
+from sqlalchemy_utils import CountryType, IPAddressType  # type: ignore[import-untyped]
 from ua_parser import user_agent_parser
 
 app = Flask(__name__)
@@ -129,23 +131,29 @@ def send_img(this_uuid: str) -> Any:
 
 
 
-from functools import wraps
+def admin_required(
+    f: Callable,
+) -> Callable:
+    """Decorator to require admin authentication."""
 
-def admin_required(f):
     @wraps(f)
-    def decorated(*args, **kwargs):
-        import os
-        from flask import request, make_response
+    def decorated(*args: Any, **kwargs: Any) -> Any:
         auth_header = request.headers.get("Authorization")
         expected_token = os.environ.get("ADMIN_TOKEN", "admin")
-        
+
         if not auth_header:
-            return make_response({"error": "Unauthorized", "message": "Missing Authorization header"}, 401)
-            
+            return make_response(
+                {"error": "Unauthorized", "message": "Missing Authorization header"},
+                401,
+            )
+
         if auth_header != f"Bearer {expected_token}":
-            return make_response({"error": "Forbidden", "message": "Invalid token"}, 403)
-            
+            return make_response(
+                {"error": "Forbidden", "message": "Invalid token"}, 403
+            )
+
         return f(*args, **kwargs)
+
     return decorated
 
 @app.route("/api/admin/login", methods=["POST"])
@@ -257,8 +265,6 @@ def get_admin_stats() -> Any:
     total_recipients = Recipients.query.count()
     total_events = Tracking.query.count()
 
-    from datetime import datetime, timedelta
-
     yesterday = datetime.now() - timedelta(days=1)
     events_today = Tracking.query.filter(Tracking.timestamp >= yesterday).count()
 
@@ -317,8 +323,6 @@ def get_analytics_summary() -> Any:
     total_events = Tracking.query.count()
     unique_recipients = Tracking.query.distinct(Tracking.recipients_id).count()
 
-    from datetime import datetime, timedelta
-
     last_week = datetime.now() - timedelta(days=7)
     events_last_week = Tracking.query.filter(Tracking.timestamp >= last_week).count()
     avg_daily = events_last_week / 7 if events_last_week > 0 else 0
@@ -347,8 +351,6 @@ def get_analytics_summary() -> Any:
 @admin_required
 def get_analytics_events() -> Any:
     """Get time-series event data."""
-    from datetime import datetime, timedelta
-
     range_days = request.args.get("range", "7d")
     days = int(range_days.replace("d", ""))
     start_date = datetime.now() - timedelta(days=days)
@@ -460,9 +462,6 @@ def get_analytics_clients() -> Any:
 @admin_required
 def export_analytics() -> Any:
     """Export analytics data as CSV."""
-    import csv
-    from io import StringIO
-
     events = Tracking.query.all()
 
     output = StringIO()
