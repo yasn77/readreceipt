@@ -16,7 +16,7 @@ from sqlalchemy_utils import CountryType, IPAddressType
 from ua_parser import user_agent_parser
 
 # Import OIDC provider
-from oidc_provider import OIDCProvider, jwt_verification_required
+from oidc_provider import OIDCProvider, jwt_verification_required, validate_token
 
 app = Flask(__name__)
 # app.config ['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'
@@ -68,9 +68,9 @@ def nocache(view: Callable) -> Callable:
     def no_cache(*args: Any, **kwargs: Any) -> Any:
         response = make_response(view(*args, **kwargs))
         response.headers["Last-Modified"] = datetime.now()
-        response.headers[
-            "Cache-Control"
-        ] = "no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0"
+        response.headers["Cache-Control"] = (
+            "no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0"
+        )
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "-1"
         return response
@@ -169,13 +169,15 @@ def admin_oidc_login() -> Any:
     if payload is None:
         return json.jsonify({"error": "Invalid or expired token"}), 401
 
-    return json.jsonify({
-        "status": "authenticated",
-        "user": {
-            "sub": payload.get("sub"),
-            "scope": payload.get("scope"),
+    return json.jsonify(
+        {
+            "status": "authenticated",
+            "user": {
+                "sub": payload.get("sub"),
+                "scope": payload.get("scope"),
+            },
         }
-    }), 200
+    ), 200
 
 
 @app.route("/api/admin/protected", methods=["GET"])
@@ -184,14 +186,16 @@ def admin_protected() -> Any:
     """Protected admin endpoint requiring valid OIDC token."""
     # Access the decoded JWT payload from request context
     payload = request.oidc_payload  # type: ignore[attr-defined]
-    return json.jsonify({
-        "status": "access_granted",
-        "message": "Welcome to the protected area",
-        "user": {
-            "sub": payload.get("sub"),
-            "scope": payload.get("scope"),
+    return json.jsonify(
+        {
+            "status": "access_granted",
+            "message": "Welcome to the protected area",
+            "user": {
+                "sub": payload.get("sub"),
+                "scope": payload.get("scope"),
+            },
         }
-    }), 200
+    ), 200
 
 
 @app.route("/api/admin/recipients", methods=["GET"])

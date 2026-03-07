@@ -12,15 +12,16 @@ from __future__ import annotations
 
 import os
 import time
-from datetime import datetime, timedelta, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from functools import wraps
-from typing import Any, Callable
+from typing import Any
 
 import jwt
-from flask import Flask, json, request, jsonify
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.backends import default_backend
+from flask import Flask, jsonify, request
 
 
 class OIDCProvider:
@@ -34,9 +35,7 @@ class OIDCProvider:
         self.authorization_endpoint = os.environ.get(
             "OIDC_AUTHORIZATION_ENDPOINT", "/oauth2/authorize"
         )
-        self.token_endpoint = os.environ.get(
-            "OIDC_TOKEN_ENDPOINT", "/oauth2/token"
-        )
+        self.token_endpoint = os.environ.get("OIDC_TOKEN_ENDPOINT", "/oauth2/token")
         self.userinfo_endpoint = os.environ.get(
             "OIDC_USERINFO_ENDPOINT", "/oauth2/userinfo"
         )
@@ -49,9 +48,7 @@ class OIDCProvider:
             "refresh_token",
             "client_credentials",
         ]
-        self.token_expiry_seconds = int(
-            os.environ.get("OIDC_TOKEN_EXPIRY", "3600")
-        )
+        self.token_expiry_seconds = int(os.environ.get("OIDC_TOKEN_EXPIRY", "3600"))
         self.refresh_token_expiry_seconds = int(
             os.environ.get("OIDC_REFRESH_TOKEN_EXPIRY", "86400")
         )
@@ -139,7 +136,8 @@ class OIDCProvider:
 
     def get_jwks(self) -> Any:
         """Return JSON Web Key Set."""
-        public_pem = self._public_key.public_bytes(
+        # Public key is used via self._public_key.public_numbers() below
+        self._public_key.public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo,
         ).decode("utf-8")
@@ -197,7 +195,15 @@ class OIDCProvider:
         nonce = request.args.get("nonce") or request.form.get("nonce")
 
         if not client_id or not redirect_uri or not response_type:
-            return jsonify({"error": "invalid_request", "error_description": "Missing required parameters"}), 400
+            return (
+                jsonify(
+                    {
+                        "error": "invalid_request",
+                        "error_description": "Missing required parameters",
+                    }
+                ),
+                400,
+            )
 
         if client_id not in self._clients:
             return jsonify({"error": "invalid_client"}), 400
@@ -252,7 +258,6 @@ class OIDCProvider:
 
         if grant_type == "authorization_code":
             code = request.form.get("code")
-            redirect_uri = request.form.get("redirect_uri")
 
             if not code or code not in self._tokens:
                 return jsonify({"error": "invalid_grant"}), 400
@@ -265,7 +270,7 @@ class OIDCProvider:
             del self._tokens[code]
 
             return self._generate_token_response(
-                client_id, token_data["scope"], token_data.get("nonce")
+                client_id, token_data["scope"], token_data.get("nonce") or None
             )
 
         elif grant_type == "refresh_token":
@@ -282,11 +287,13 @@ class OIDCProvider:
             del self._refresh_tokens[refresh_token]
 
             return self._generate_token_response(
-                client_id, refresh_data["scope"], include_refresh=True
+                client_id, refresh_data["scope"], None, include_refresh=True
             )
 
         elif grant_type == "client_credentials":
-            return self._generate_token_response(client_id, "client", include_refresh=False)
+            return self._generate_token_response(
+                client_id, "client", include_refresh=False
+            )
 
         return jsonify({"error": "unsupported_grant_type"}), 400
 
@@ -298,7 +305,7 @@ class OIDCProvider:
         include_refresh: bool = True,
     ) -> Any:
         """Generate access token and ID token."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expires_at = now + timedelta(seconds=self.token_expiry_seconds)
 
         # Generate access token
@@ -369,11 +376,13 @@ class OIDCProvider:
                 audience=self._clients.keys() if self._clients else None,
             )
 
-            return jsonify({
-                "sub": payload.get("sub"),
-                "name": f"User {payload.get('sub')}",
-                "email": f"{payload.get('sub')}@readreceipt.local",
-            }), 200
+            return jsonify(
+                {
+                    "sub": payload.get("sub"),
+                    "name": f"User {payload.get('sub')}",
+                    "email": f"{payload.get('sub')}@readreceipt.local",
+                }
+            ), 200
         except jwt.InvalidTokenError:
             return jsonify({"error": "invalid_token"}), 401
 
@@ -381,7 +390,7 @@ class OIDCProvider:
         """Check OIDC provider health status."""
         health_status = {
             "status": "healthy",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "components": {
                 "issuer_configured": bool(self.issuer),
                 "jwks_available": True,
@@ -391,7 +400,9 @@ class OIDCProvider:
                 "active_refresh_tokens": len(self._refresh_tokens),
             },
             "endpoints": {
-                "openid_configuration": f"{self.issuer}/.well-known/openid-configuration",
+                "openid_configuration": (
+                    f"{self.issuer}/.well-known/openid-configuration"
+                ),
                 "jwks_uri": f"{self.issuer}/.well-known/jwks.json",
                 "authorization": f"{self.issuer}{self.authorization_endpoint}",
                 "token": f"{self.issuer}{self.token_endpoint}",
@@ -411,7 +422,15 @@ def jwt_verification_required(
         def decorated_function(*args: Any, **kwargs: Any) -> Any:
             auth_header = request.headers.get("Authorization", "")
             if not auth_header.startswith("Bearer "):
-                return jsonify({"error": "unauthorized", "message": "Missing Authorization header"}), 401
+                return (
+                    jsonify(
+                        {
+                            "error": "unauthorized",
+                            "message": "Missing Authorization header",
+                        }
+                    ),
+                    401,
+                )
 
             token = auth_header[7:]
             try:
@@ -421,7 +440,9 @@ def jwt_verification_required(
                     oidc_provider._public_key,
                     algorithms=["RS256"],
                     issuer=oidc_provider.issuer,
-                    options={"verify_aud": False},  # Optional: validate audience if needed
+                    options={
+                        "verify_aud": False,  # Optional: validate audience if needed
+                    },
                 )
                 # Attach decoded payload to request context
                 request.oidc_payload = payload  # type: ignore[attr-defined]
@@ -448,6 +469,6 @@ def validate_token(token: str, oidc_provider: OIDCProvider) -> dict[str, Any] | 
             issuer=oidc_provider.issuer,
             options={"verify_aud": False},
         )
-        return payload
+        return dict(payload)
     except jwt.InvalidTokenError:
         return None

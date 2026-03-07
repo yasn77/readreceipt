@@ -1,11 +1,15 @@
 """Tests for OIDC provider integration."""
 
+from __future__ import annotations
+
 import pytest
-from app import app, oidc
+from flask.testing import FlaskClient
+
+from app import app
 
 
 @pytest.fixture
-def client():
+def client() -> FlaskClient:
     """Create test client."""
     app.config["TESTING"] = True
     with app.test_client() as client:
@@ -15,7 +19,7 @@ def client():
 class TestOpenIDConfiguration:
     """Test OIDC discovery endpoint."""
 
-    def test_openid_configuration_endpoint(self, client):
+    def test_openid_configuration_endpoint(self, client: FlaskClient) -> None:
         """Test that OIDC configuration is exposed."""
         response = client.get("/.well-known/openid-configuration")
         assert response.status_code == 200
@@ -26,7 +30,7 @@ class TestOpenIDConfiguration:
         assert "jwks_uri" in data
         assert "scopes_supported" in data
 
-    def test_jwks_endpoint(self, client):
+    def test_jwks_endpoint(self, client: FlaskClient) -> None:
         """Test that JWKS endpoint returns valid keys."""
         response = client.get("/.well-known/jwks.json")
         assert response.status_code == 200
@@ -41,14 +45,14 @@ class TestOpenIDConfiguration:
 class TestAuthorizationEndpoint:
     """Test authorization endpoint."""
 
-    def test_authorize_missing_params(self, client):
+    def test_authorize_missing_params(self, client: FlaskClient) -> None:
         """Test authorization with missing parameters."""
         response = client.get("/oauth2/authorize")
         assert response.status_code == 400
         data = response.get_json()
         assert "error" in data
 
-    def test_authorize_invalid_client(self, client):
+    def test_authorize_invalid_client(self, client: FlaskClient) -> None:
         """Test authorization with invalid client."""
         response = client.get(
             "/oauth2/authorize?client_id=invalid&redirect_uri=http://example.com&response_type=code"
@@ -57,7 +61,7 @@ class TestAuthorizationEndpoint:
         data = response.get_json()
         assert data["error"] == "invalid_client"
 
-    def test_authorize_success(self, client):
+    def test_authorize_success(self, client: FlaskClient) -> None:
         """Test successful authorization request."""
         response = client.get(
             "/oauth2/authorize?client_id=readreceipt-admin&redirect_uri=http://localhost:3000/callback&response_type=code&scope=openid&state=test123"
@@ -71,14 +75,14 @@ class TestAuthorizationEndpoint:
 class TestTokenEndpoint:
     """Test token endpoint."""
 
-    def test_token_missing_grant_type(self, client):
+    def test_token_missing_grant_type(self, client: FlaskClient) -> None:
         """Test token request without grant type."""
         response = client.post("/oauth2/token", data={})
         assert response.status_code == 400
         data = response.get_json()
         assert data["error"] == "invalid_request"
 
-    def test_token_invalid_client(self, client):
+    def test_token_invalid_client(self, client: FlaskClient) -> None:
         """Test token request with invalid client."""
         response = client.post(
             "/oauth2/token",
@@ -92,7 +96,7 @@ class TestTokenEndpoint:
         data = response.get_json()
         assert data["error"] == "invalid_client"
 
-    def test_token_invalid_code(self, client):
+    def test_token_invalid_code(self, client: FlaskClient) -> None:
         """Test token request with invalid authorization code."""
         response = client.post(
             "/oauth2/token",
@@ -111,14 +115,14 @@ class TestTokenEndpoint:
 class TestUserinfoEndpoint:
     """Test userinfo endpoint."""
 
-    def test_userinfo_no_token(self, client):
+    def test_userinfo_no_token(self, client: FlaskClient) -> None:
         """Test userinfo without token."""
         response = client.get("/oauth2/userinfo")
         assert response.status_code == 401
         data = response.get_json()
         assert data["error"] == "unauthorized"
 
-    def test_userinfo_invalid_token(self, client):
+    def test_userinfo_invalid_token(self, client: FlaskClient) -> None:
         """Test userinfo with invalid token."""
         response = client.get(
             "/oauth2/userinfo",
@@ -132,7 +136,7 @@ class TestUserinfoEndpoint:
 class TestHealthEndpoint:
     """Test OIDC health check endpoint."""
 
-    def test_health_check(self, client):
+    def test_health_check(self, client: FlaskClient) -> None:
         """Test OIDC health check returns status."""
         response = client.get("/api/oidc/health")
         assert response.status_code == 200
@@ -142,7 +146,7 @@ class TestHealthEndpoint:
         assert "components" in data
         assert "endpoints" in data
 
-    def test_health_check_components(self, client):
+    def test_health_check_components(self, client: FlaskClient) -> None:
         """Test health check includes all components."""
         response = client.get("/api/oidc/health")
         data = response.get_json()
@@ -156,14 +160,14 @@ class TestHealthEndpoint:
 class TestProtectedEndpoint:
     """Test protected endpoints with JWT verification."""
 
-    def test_protected_no_auth(self, client):
+    def test_protected_no_auth(self, client: FlaskClient) -> None:
         """Test protected endpoint without authentication."""
         response = client.get("/api/admin/protected")
         assert response.status_code == 401
         data = response.get_json()
         assert data["error"] == "unauthorized"
 
-    def test_protected_invalid_token(self, client):
+    def test_protected_invalid_token(self, client: FlaskClient) -> None:
         """Test protected endpoint with invalid token."""
         response = client.get(
             "/api/admin/protected",
@@ -177,7 +181,7 @@ class TestProtectedEndpoint:
 class TestOIDCClientRegistration:
     """Test OIDC client registration."""
 
-    def test_client_registered(self, client):
+    def test_client_registered(self, client: FlaskClient) -> None:
         """Test that demo client is registered."""
         response = client.get("/api/oidc/health")
         data = response.get_json()
@@ -185,7 +189,7 @@ class TestOIDCClientRegistration:
 
 
 @pytest.fixture
-def auth_code_flow_client():
+def auth_code_flow_client() -> tuple[FlaskClient, dict]:  # type: ignore[misc]
     """Test client for full auth code flow."""
     app.config["TESTING"] = True
     with app.test_client() as client:
@@ -213,13 +217,15 @@ def auth_code_flow_client():
         )
         token_data = token_response.get_json()
 
-        yield client, token_data
+        yield client, token_data  # type: ignore[misc]
 
 
 class TestFullAuthCodeFlow:
     """Test complete authorization code flow."""
 
-    def test_full_auth_code_flow(self, auth_code_flow_client):
+    def test_full_auth_code_flow(
+        self, auth_code_flow_client: tuple[FlaskClient, dict]
+    ) -> None:
         """Test complete OIDC authorization code flow."""
         client, token_data = auth_code_flow_client
 
@@ -241,7 +247,9 @@ class TestFullAuthCodeFlow:
         assert protected_data["status"] == "access_granted"
         assert "user" in protected_data
 
-    def test_refresh_token_flow(self, auth_code_flow_client):
+    def test_refresh_token_flow(
+        self, auth_code_flow_client: tuple[FlaskClient, dict]
+    ) -> None:
         """Test token refresh flow."""
         client, token_data = auth_code_flow_client
 
@@ -267,7 +275,7 @@ class TestFullAuthCodeFlow:
 class TestClientCredentialsFlow:
     """Test client credentials grant type."""
 
-    def test_client_credentials_grant(self, client):
+    def test_client_credentials_grant(self, client: FlaskClient) -> None:
         """Test client credentials flow."""
         response = client.post(
             "/oauth2/token",
@@ -282,4 +290,5 @@ class TestClientCredentialsFlow:
         token_data = response.get_json()
         assert "access_token" in token_data
         assert "id_token" not in token_data  # No ID token for client credentials
-        assert "refresh_token" not in token_data  # No refresh token for client credentials
+        # No refresh token for client credentials
+        assert "refresh_token" not in token_data
