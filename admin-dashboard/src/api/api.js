@@ -1,6 +1,20 @@
 import axios from 'axios'
+import { UserManager } from 'oidc-client-ts'
 
 const API_BASE_URL = '/api'
+
+// OIDC configuration from environment variables
+const oidcConfig = {
+  authority: import.meta.env.VITE_OIDC_AUTHORITY || 'http://localhost:8000',
+  client_id: import.meta.env.VITE_OIDC_CLIENT_ID || 'admin-dashboard',
+  redirect_uri: `${window.location.origin}/callback`,
+  response_type: 'code',
+  scope: 'openid profile email',
+  post_logout_redirect_uri: window.location.origin
+}
+
+// Create user manager for OIDC
+export const userManager = new UserManager(oidcConfig)
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -9,19 +23,26 @@ const api = axios.create({
   }
 })
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('adminToken')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+// Request interceptor to add OIDC access token
+api.interceptors.request.use(async (config) => {
+  try {
+    const user = await userManager.getUser()
+    if (user && user.access_token) {
+      config.headers.Authorization = `Bearer ${user.access_token}`
+    }
+  } catch (error) {
+    // No valid token, will be handled by response interceptor
   }
   return config
 })
 
+// Response interceptor to handle 401 errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('adminToken')
+      // Clear any stored session and redirect to login
+      userManager.removeUser()
       window.location.href = '/login'
     }
     return Promise.reject(error)
@@ -46,6 +67,12 @@ export const analyticsApi = {
   getGeo: () => api.get('/analytics/geo'),
   getClients: () => api.get('/analytics/clients'),
   export: () => api.get('/analytics/export')
+}
+
+export const authApi = {
+  login: () => api.post('/auth/login'),
+  logout: () => api.post('/auth/logout'),
+  callback: (code) => api.post('/auth/callback', { code })
 }
 
 export default api
