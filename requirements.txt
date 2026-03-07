@@ -6,9 +6,13 @@ Flask-Limiter==3.12.0
 Pillow==12.1.1
 SQLAlchemy-Utils==0.42.1
 gunicorn==25.1.0
-psycopg2==2.9.11
+psycopg2-binary==2.9.11
 ua-parser==1.0.1
 bleach==6.2.0
+
+# OIDC and JWT support
+PyJWT==2.10.1
+cryptography==45.0.5
 
 # Testing
 pytest==9.0.2

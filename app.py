@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import csv
 import io
 import json
 import logging
 import os
 import uuid
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import update_wrapper, wraps
+from io import StringIO
 from typing import Any
 
 from flask import Flask, g, json, make_response, request, send_file
@@ -19,6 +21,9 @@ from ua_parser import user_agent_parser
 
 # Import security module
 from security import init_security, require_admin
+
+# Import OIDC provider
+from oidc_provider import OIDCProvider, jwt_verification_required, validate_token
 
 app = Flask(__name__)
 # app.config ['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'
@@ -33,6 +38,17 @@ migrate = Migrate(app, db)
 
 # Initialize security features (headers, rate limiting, input validation, logging, RBAC)
 limiter = init_security(app)
+
+# Initialise OIDC provider
+oidc = OIDCProvider(app)
+
+# Register a demo OIDC client (for testing/development)
+oidc.register_client(
+    client_id="readreceipt-admin",
+    client_secret=os.environ.get("OIDC_CLIENT_SECRET", "admin-secret"),
+    redirect_uris=["http://localhost:3000/callback", "http://localhost:8080/callback"],
+    grant_types=["authorization_code", "refresh_token"],
+)
 
 
 class Recipients(db.Model):  # type: ignore[name-defined]
@@ -63,9 +79,9 @@ def nocache(view: Callable) -> Callable:
     def no_cache(*args: Any, **kwargs: Any) -> Any:
         response = make_response(view(*args, **kwargs))
         response.headers["Last-Modified"] = datetime.now()
-        response.headers[
-            "Cache-Control"
-        ] = "no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0"
+        response.headers["Cache-Control"] = (
+            "no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0"
+        )
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "-1"
         return response
@@ -190,6 +206,32 @@ def send_img(this_uuid: str) -> Any:
     return send_file(img_io, download_name="1.png", mimetype="image/png")  # type: ignore[call-arg]
 
 
+def admin_required(
+    f: Callable,
+) -> Callable:
+    """Decorator to require admin authentication."""
+
+    @wraps(f)
+    def decorated(*args: Any, **kwargs: Any) -> Any:
+        auth_header = request.headers.get("Authorization")
+        expected_token = os.environ.get("ADMIN_TOKEN", "admin")
+
+        if not auth_header:
+            return make_response(
+                {"error": "Unauthorized", "message": "Missing Authorization header"},
+                401,
+            )
+
+        if auth_header != f"Bearer {expected_token}":
+            return make_response(
+                {"error": "Forbidden", "message": "Invalid token"}, 403
+            )
+
+        return f(*args, **kwargs)
+
+    return decorated
+
+
 @app.route("/api/admin/login", methods=["POST"])
 def admin_login() -> Any:
     """Admin login endpoint with token authentication."""
@@ -221,6 +263,49 @@ def admin_login() -> Any:
         f"AUDIT: Failed admin login attempt from {request.remote_addr}"
     )
     return json.jsonify({"error": "Invalid token"}), 401
+
+
+@app.route("/api/admin/oidc/login", methods=["POST"])
+def admin_oidc_login() -> Any:
+    """Admin login endpoint with OIDC token authentication."""
+    data = request.get_json()
+    access_token = data.get("access_token")
+
+    if not access_token:
+        return json.jsonify({"error": "access_token is required"}), 400
+
+    # Validate the OIDC token
+    payload = validate_token(access_token, oidc)
+    if payload is None:
+        return json.jsonify({"error": "Invalid or expired token"}), 401
+
+    return json.jsonify(
+        {
+            "status": "authenticated",
+            "user": {
+                "sub": payload.get("sub"),
+                "scope": payload.get("scope"),
+            },
+        }
+    ), 200
+
+
+@app.route("/api/admin/protected", methods=["GET"])
+@jwt_verification_required(oidc)
+def admin_protected() -> Any:
+    """Protected admin endpoint requiring valid OIDC token."""
+    # Access the decoded JWT payload from request context
+    payload = request.oidc_payload  # type: ignore[attr-defined]
+    return json.jsonify(
+        {
+            "status": "access_granted",
+            "message": "Welcome to the protected area",
+            "user": {
+                "sub": payload.get("sub"),
+                "scope": payload.get("scope"),
+            },
+        }
+    ), 200
 
 
 @app.route("/api/admin/recipients", methods=["GET"])
@@ -372,9 +457,7 @@ def get_admin_stats() -> Any:
     total_recipients = Recipients.query.count()
     total_events = Tracking.query.count()
 
-    from datetime import datetime as dt, timedelta
-
-    yesterday = dt.now() - timedelta(days=1)
+    yesterday = datetime.now() - timedelta(days=1)
     events_today = Tracking.query.filter(Tracking.timestamp >= yesterday).count()
 
     recent_events = Tracking.query.order_by(Tracking.timestamp.desc()).limit(5).all()
@@ -451,9 +534,7 @@ def get_analytics_summary() -> Any:
     total_events = Tracking.query.count()
     unique_recipients = Tracking.query.distinct(Tracking.recipients_id).count()
 
-    from datetime import datetime as dt, timedelta
-
-    last_week = dt.now() - timedelta(days=7)
+    last_week = datetime.now() - timedelta(days=7)
     events_last_week = Tracking.query.filter(Tracking.timestamp >= last_week).count()
     avg_daily = events_last_week / 7 if events_last_week > 0 else 0
 
@@ -481,8 +562,6 @@ def get_analytics_summary() -> Any:
 @require_admin
 def get_analytics_events() -> Any:
     """Get time-series event data."""
-    from datetime import datetime as dt, timedelta
-
     # Validate and sanitize range parameter (Issue #107)
     range_days = request.args.get("range", "7d")
     
@@ -497,7 +576,7 @@ def get_analytics_events() -> Any:
     if days > 365 or days < 1:
         return json.jsonify({"error": "Range must be between 1 and 365 days"}), 400
     
-    start_date = dt.now() - timedelta(days=days)
+    start_date = datetime.now() - timedelta(days=days)
 
     events = Tracking.query.filter(Tracking.timestamp >= start_date).all()
 
@@ -606,9 +685,6 @@ def get_analytics_clients() -> Any:
 @require_admin
 def export_analytics() -> Any:
     """Export analytics data as CSV."""
-    import csv
-    from io import StringIO
-
     events = Tracking.query.all()
 
     output = StringIO()

@@ -11,41 +11,28 @@ git clone https://github.com/yasn77/readreceipt.git
 cd readreceipt
 ```
 
-### 2. Set Up Python Environment
+### 2. Set Up Environment with mise
 
-We use `mise` for environment management:
+We use `mise` for development environment management. It automatically manages Python, Node.js, and all required tools.
 
 ```bash
-# Install mise
+# Install mise (if not already installed)
 curl https://mise.run | sh
 
-# Install Python
-mise use python@3.11
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
+# Install all tools and dependencies
+mise install
 ```
 
-### 3. Set Up Node.js Environment
+This will:
+- Install Python 3.11 and Node.js 20
+- Set up a virtual environment using `uv`
+- Install all Python dependencies
+- Install all frontend dependencies
+
+### 3. Install Pre-commit Hooks
 
 ```bash
-# Install Node.js via mise
-mise use node@20
-
-# Install admin dashboard dependencies
-cd admin-dashboard
-npm install
-```
-
-### 4. Install Pre-commit Hooks
-
-```bash
-pip install pre-commit
-pre-commit install
+mise run hooks
 ```
 
 ## Code Style
@@ -59,13 +46,12 @@ pre-commit install
 - Write docstrings for public functions and classes
 
 ```bash
-# Lint
+# Lint with mise
+mise run lint
+
+# Or run individual tools
 ruff check .
-
-# Format
 black .
-
-# Type check
 mypy .
 ```
 
@@ -81,12 +67,36 @@ cd admin-dashboard
 npm run lint
 ```
 
+## mise Tasks
+
+We use `mise` to manage our development workflow. Here are the available tasks:
+
+### Core Tasks
+
+- `mise run install` - Install all dependencies (backend + frontend)
+- `mise run dev` - Run backend development server
+- `mise run dev-frontend` - Run frontend development server
+- `mise run test` - Run tests with pytest
+- `mise run lint` - Run linters (ruff, black, mypy)
+- `mise run build` - Build frontend (admin-dashboard)
+- `mise run clean` - Clean build artifacts and cache
+
+### Additional Tasks
+
+- `mise run format` - Format code with black
+- `mise run hooks` - Run pre-commit hooks on all files
+- `mise run security` - Run security scans (bandit, safety)
+- `mise run ci` - Run full CI pipeline (lint + test + build)
+
 ## Testing
 
 ### Running Tests
 
 ```bash
-# Backend tests
+# Backend tests (using mise)
+mise run test
+
+# Or directly with pytest
 pytest
 
 # Frontend tests
