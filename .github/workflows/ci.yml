@@ -9,7 +9,7 @@ on:
 jobs:
   # Security scanning (Issue #110)
   security-scan:
-    runs-on: ubuntu-latest
+    runs-on: readreceipt
     steps:
       - uses: actions/checkout@v6
 
@@ -32,7 +32,7 @@ jobs:
           bandit -r . -x tests/,migrations/,admin-dashboard/,extensions/ || true
 
   lint-and-test:
-    runs-on: ubuntu-latest
+    runs-on: readreceipt
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
@@ -83,7 +83,7 @@ jobs:
           fail_ci_if_error: false
 
   extension-tests:
-    runs-on: ubuntu-latest
+    runs-on: readreceipt
     steps:
       - uses: actions/checkout@v6
 
@@ -111,7 +111,7 @@ jobs:
           python -c "import json; json.load(open('manifest.json'))" || echo "manifest.json validation skipped"
 
   frontend-tests:
-    runs-on: ubuntu-latest
+    runs-on: readreceipt
     steps:
       - uses: actions/checkout@v6
 

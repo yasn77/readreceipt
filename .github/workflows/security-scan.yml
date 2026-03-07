@@ -12,7 +12,7 @@ on:
 jobs:
   # Dependency vulnerability scanning with Safety
   dependency-scan:
-    runs-on: ubuntu-latest
+    runs-on: readreceipt
     steps:
       - uses: actions/checkout@v6
 
@@ -41,7 +41,7 @@ jobs:
 
   # Static code security analysis with Bandit
   code-scan:
-    runs-on: ubuntu-latest
+    runs-on: readreceipt
     steps:
       - uses: actions/checkout@v6
 
@@ -70,7 +70,7 @@ jobs:
 
   # Container security scanning with Trivy
   container-scan:
-    runs-on: ubuntu-latest
+    runs-on: readreceipt
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     steps:
       - uses: actions/checkout@v6
@@ -87,7 +87,7 @@ jobs:
 
   # Dependency review for PRs
   dependency-review:
-    runs-on: ubuntu-latest
+    runs-on: readreceipt
     if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v6
