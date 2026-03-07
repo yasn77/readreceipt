@@ -5,6 +5,7 @@ Implements security headers, rate limiting, input validation, logging hardening,
 from __future__ import annotations
 
 import functools
+import json
 import logging
 import os
 import re
@@ -286,99 +287,111 @@ def setup_hardened_logging(app: Flask) -> None:
     app.logger = SafeRequestLogger(app.logger.name)
 
 
+# Module-level storage for admin token (initialized in setup_rbac)
+_admin_token = None
+
+
+def get_user_roles(token: str) -> list[str]:
+    """
+    Get user roles from token.
+    In production, this would decode JWT and extract claims.
+    """
+    admin_token = _admin_token or os.environ.get("ADMIN_TOKEN", "admin")
+    if token == admin_token:
+        return ["admin"]
+    return ["viewer"]
+
+
+def audit_log(
+    action: str,
+    user_token: str,
+    remote_addr: str,
+    user_agent: str,
+    endpoint: str,
+    method: str,
+    details: dict[str, Any] | None = None,
+) -> None:
+    """
+    Log admin actions for audit trail.
+    Sensitive data is automatically redacted.
+    """
+    log_entry = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "action": action,
+        "user_token": user_token,
+        "remote_addr": remote_addr,
+        "user_agent": user_agent[:100],  # Truncate user agent
+        "endpoint": endpoint,
+        "method": method,
+        "details": details or {},
+    }
+    logger.info(f"AUDIT: {json.dumps(log_entry)}")
+
+
+def require_admin(f: Callable) -> Callable:
+    """
+    Issue #109: IAM/roles - define admin vs. user scopes and audit admin actions.
+    Decorator to require admin authentication for endpoints.
+    """
+
+    @functools.wraps(f)
+    def decorated_function(*args: Any, **kwargs: Any) -> Any:
+        # Check for Authorization header
+        auth_header = request.headers.get("Authorization", "")
+
+        if not auth_header.startswith("Bearer "):
+            # Try cookie-based auth as fallback
+            token = request.cookies.get("admin_token")
+            if not token:
+                return jsonify({"error": "Unauthorized: Missing authentication"}), 401
+        else:
+            token = auth_header.split(" ")[1]
+
+        # Validate token
+        admin_token = _admin_token or os.environ.get("ADMIN_TOKEN", "admin")
+        if token != admin_token:
+            # Audit failed login attempt
+            logger.warning(
+                f"Unauthorized admin access attempt from {request.remote_addr}"
+            )
+            return jsonify({"error": "Unauthorized: Invalid token"}), 401
+
+        # Get user roles from token or environment
+        # In production, this would decode JWT and extract roles
+        user_roles = get_user_roles(token)
+
+        # Check if user has required role
+        if "admin" not in user_roles:
+            logger.warning(
+                f"Forbidden admin access attempt by user with roles: {user_roles}"
+            )
+            return jsonify({"error": "Forbidden: Admin access required"}), 403
+
+        # Audit successful admin action
+        audit_log(
+            action=f.__name__,
+            user_token=token[:8] + "...",  # Log partial token for traceability
+            remote_addr=request.remote_addr,
+            user_agent=request.headers.get("User-Agent", "Unknown"),
+            endpoint=request.path,
+            method=request.method,
+        )
+
+        # Store user info in request context
+        g.current_user = {"token": token, "roles": user_roles}
+
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+
 def setup_rbac(app: Flask) -> None:
     """
     Issue #109: IAM/roles - define admin vs. user scopes and audit admin actions.
-    Implements role-based access control with audit logging.
+    Initializes RBAC configuration and stores admin token.
     """
-
-    def require_admin(f: Callable) -> Callable:
-        """Decorator to require admin authentication for endpoints."""
-
-        @functools.wraps(f)
-        def decorated_function(*args: Any, **kwargs: Any) -> Any:
-            # Check for Authorization header
-            auth_header = request.headers.get("Authorization", "")
-
-            if not auth_header.startswith("Bearer "):
-                # Try cookie-based auth as fallback
-                token = request.cookies.get("admin_token")
-                if not token:
-                    return jsonify({"error": "Unauthorized: Missing authentication"}), 401
-            else:
-                token = auth_header.split(" ")[1]
-
-            # Validate token
-            admin_token = os.environ.get("ADMIN_TOKEN", "admin")
-            if token != admin_token:
-                # Audit failed login attempt
-                logger.warning(
-                    f"Unauthorized admin access attempt from {request.remote_addr}"
-                )
-                return jsonify({"error": "Unauthorized: Invalid token"}), 401
-
-            # Get user roles from token or environment
-            # In production, this would decode JWT and extract roles
-            user_roles = get_user_roles(token)
-
-            # Check if user has required role
-            if "admin" not in user_roles:
-                logger.warning(
-                    f"Forbidden admin access attempt by user with roles: {user_roles}"
-                )
-                return jsonify({"error": "Forbidden: Admin access required"}), 403
-
-            # Audit successful admin action
-            audit_log(
-                action=f.__name__,
-                user_token=token[:8] + "...",  # Log partial token for traceability
-                remote_addr=request.remote_addr,
-                user_agent=request.headers.get("User-Agent", "Unknown"),
-                endpoint=request.path,
-                method=request.method,
-            )
-
-            # Store user info in request context
-            g.current_user = {"token": token, "roles": user_roles}
-
-            return f(*args, **kwargs)
-
-        return decorated_function
-
-    def get_user_roles(token: str) -> list[str]:
-        """
-        Get user roles from token.
-        In production, this would decode JWT and extract claims.
-        """
-        admin_token = os.environ.get("ADMIN_TOKEN", "admin")
-        if token == admin_token:
-            return ["admin"]
-        return ["viewer"]
-
-    def audit_log(
-        action: str,
-        user_token: str,
-        remote_addr: str,
-        user_agent: str,
-        endpoint: str,
-        method: str,
-        details: dict[str, Any] | None = None,
-    ) -> None:
-        """
-        Log admin actions for audit trail.
-        Sensitive data is automatically redacted.
-        """
-        log_entry = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "action": action,
-            "user_token": user_token,
-            "remote_addr": remote_addr,
-            "user_agent": user_agent[:100],  # Truncate user agent
-            "endpoint": endpoint,
-            "method": method,
-            "details": details or {},
-        }
-        logger.info(f"AUDIT: {json.dumps(log_entry)}")
+    global _admin_token
+    _admin_token = os.environ.get("ADMIN_TOKEN", "admin")
 
     # Export for use in routes
     app.config["REQUIRE_ADMIN"] = require_admin
