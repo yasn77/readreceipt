@@ -13,10 +13,9 @@ from __future__ import annotations
 import os
 import time
 from collections.abc import Callable
-from typing import cast
 from datetime import UTC, datetime, timedelta
 from functools import wraps
-from typing import Any
+from typing import Any, cast
 
 import jwt
 from cryptography.hazmat.backends import default_backend
@@ -272,9 +271,7 @@ class OIDCProvider:
 
             nonce_value = token_data.get("nonce") or ""
             scope_value: str = cast(str, token_data.get("scope", ""))
-            return self._generate_token_response(
-                client_id, scope_value, nonce_value
-            )
+            return self._generate_token_response(client_id, scope_value, nonce_value)
 
         elif grant_type == "refresh_token":
             refresh_token = request.form.get("refresh_token")
