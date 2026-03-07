@@ -5,7 +5,10 @@ uv = "latest"
 npm = "latest"
 
 [settings.python]
-uv_venv_auto = true
+uv_venv_auto = "create|source"
+
+[env]
+_.python.venv = { path = ".venv", create = true, uv_create_args = ['--seed'] }
 
 [tasks]
 # Install all dependencies (backend + frontend)

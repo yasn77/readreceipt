@@ -26,3 +26,17 @@ repos:
           - types-flask
         args: [--ignore-missing-imports]
         files: ^(app\.py|tests/|scripts/)
+
+  # Security scanning hooks (Issue #110)
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.6
+    hooks:
+      - id: bandit
+        args: ["-r", ".", "-x", "tests/,migrations/,admin-dashboard/,extensions/"]
+        additional_dependencies: ["bandit"]
+
+  - repo: https://github.com/Lucas-C/pre-commit-hooks-safety
+    rev: v1.3.3
+    hooks:
+      - id: python-safety-dependencies-check
+        files: requirements.txt
