@@ -65,3 +65,8 @@ exclude_lines = [
 ]
 fail_under = 90
 show_missing = true
+
+# Override for OIDC provider module - allow arg-type due to Any in token dicts
+[[tool.mypy.overrides]]
+module = "oidc_provider"
+disable_error_code = ["arg-type"]
