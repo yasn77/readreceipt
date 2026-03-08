@@ -5,13 +5,7 @@
     ":semanticCommits",
     ":semanticCommitTypeAll(chore)"
   ],
-  "labels": ["renovate"],
-  "labels": ["dependencies"],
-  
-  "groupName": "all dependencies",
-  "group": {
-    "enabled": true
-  },
+  "labels": ["renovate", "dependencies"],
   
   "packageRules": [
     {
