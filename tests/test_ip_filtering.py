@@ -3,7 +3,6 @@ Tests for Issue #151 - IP-based own-open filtering
 """
 
 import uuid
-from datetime import datetime
 
 import pytest
 
@@ -22,22 +21,22 @@ class TestIPBlocklistEndpoints:
         """Create test client with admin user."""
         app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
         app.config["TESTING"] = True
-        
+
         with app.app_context():
             db.create_all()
-            
+
             # Create admin user
             admin = AdminUser(
                 email="admin@test.com",
                 oidc_sub="test-admin-sub",
                 roles=["admin"],
-                ip_blocklist=[]
+                ip_blocklist=[],
             )
             db.session.add(admin)
             db.session.commit()
-            
+
             yield app.test_client()
-            
+
             db.session.remove()
             db.drop_all()
 
@@ -47,9 +46,7 @@ class TestIPBlocklistEndpoints:
         with app.app_context():
             test_uuid = str(uuid.uuid4())
             recipient = Recipients(
-                r_uuid=test_uuid, 
-                description="Test", 
-                email="test@example.com"
+                r_uuid=test_uuid, description="Test", email="test@example.com"
             )
             db.session.add(recipient)
             db.session.commit()
@@ -58,8 +55,7 @@ class TestIPBlocklistEndpoints:
     def test_get_ip_blocklist_empty(self, admin_client):
         """Test getting empty IP blocklist."""
         response = admin_client.get(
-            "/api/admin/ip-blocklist",
-            headers=self.auth_headers()
+            "/api/admin/ip-blocklist", headers=self.auth_headers()
         )
         assert response.status_code == 200
         data = response.get_json()
@@ -72,7 +68,7 @@ class TestIPBlocklistEndpoints:
             "/api/admin/ip-blocklist",
             json={"ip_address": "192.168.1.1"},
             headers=self.auth_headers(),
-            content_type="application/json"
+            content_type="application/json",
         )
         assert response.status_code == 201
         data = response.get_json()
@@ -86,7 +82,7 @@ class TestIPBlocklistEndpoints:
             "/api/admin/ip-blocklist",
             json={"ip_address": "2001:db8::1"},
             headers=self.auth_headers(),
-            content_type="application/json"
+            content_type="application/json",
         )
         assert response.status_code == 201
         data = response.get_json()
@@ -100,15 +96,15 @@ class TestIPBlocklistEndpoints:
             "/api/admin/ip-blocklist",
             json={"ip_address": "10.0.0.1"},
             headers=self.auth_headers(),
-            content_type="application/json"
+            content_type="application/json",
         )
-        
+
         # Try to add again
         response = admin_client.post(
             "/api/admin/ip-blocklist",
             json={"ip_address": "10.0.0.1"},
             headers=self.auth_headers(),
-            content_type="application/json"
+            content_type="application/json",
         )
         assert response.status_code == 409
         data = response.get_json()
@@ -120,7 +116,7 @@ class TestIPBlocklistEndpoints:
             "/api/admin/ip-blocklist",
             json={"ip_address": "not-an-ip"},
             headers=self.auth_headers(),
-            content_type="application/json"
+            content_type="application/json",
         )
         assert response.status_code == 400
         data = response.get_json()
@@ -133,7 +129,7 @@ class TestIPBlocklistEndpoints:
             "/api/admin/ip-blocklist/validate",
             json={"ip_address": "192.168.1.1"},
             headers=self.auth_headers(),
-            content_type="application/json"
+            content_type="application/json",
         )
         assert response.status_code == 200
         data = response.get_json()
@@ -145,7 +141,7 @@ class TestIPBlocklistEndpoints:
             "/api/admin/ip-blocklist/validate",
             json={"ip_address": "2001:db8::1"},
             headers=self.auth_headers(),
-            content_type="application/json"
+            content_type="application/json",
         )
         assert response.status_code == 200
         data = response.get_json()
@@ -157,7 +153,7 @@ class TestIPBlocklistEndpoints:
             "/api/admin/ip-blocklist/validate",
             json={"ip_address": "invalid"},
             headers=self.auth_headers(),
-            content_type="application/json"
+            content_type="application/json",
         )
         assert response.status_code == 400
         data = response.get_json()
@@ -170,13 +166,12 @@ class TestIPBlocklistEndpoints:
             "/api/admin/ip-blocklist",
             json={"ip_address": "172.16.0.1"},
             headers=self.auth_headers(),
-            content_type="application/json"
+            content_type="application/json",
         )
-        
+
         # Remove it
         response = admin_client.delete(
-            "/api/admin/ip-blocklist/172.16.0.1",
-            headers=self.auth_headers()
+            "/api/admin/ip-blocklist/172.16.0.1", headers=self.auth_headers()
         )
         assert response.status_code == 200
         data = response.get_json()
@@ -186,8 +181,7 @@ class TestIPBlocklistEndpoints:
     def test_remove_nonexistent_ip(self, admin_client):
         """Test removing IP not in blocklist returns 404."""
         response = admin_client.delete(
-            "/api/admin/ip-blocklist/1.2.3.4",
-            headers=self.auth_headers()
+            "/api/admin/ip-blocklist/1.2.3.4", headers=self.auth_headers()
         )
         assert response.status_code == 404
         data = response.get_json()
@@ -201,136 +195,134 @@ class TestIPBasedFiltering:
         """Test that tracking is blocked when requesting IP is in blocklist."""
         app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
         app.config["TESTING"] = True
-        
+
         with app.test_client() as client:
             with app.app_context():
                 db.create_all()
-                
+
                 # Create admin user with IP blocklist
                 admin = AdminUser(
                     email="admin@test.com",
                     oidc_sub="test-sub",
                     roles=["admin"],
-                    ip_blocklist=["203.0.113.1", "198.51.100.1"]
+                    ip_blocklist=["203.0.113.1", "198.51.100.1"],
                 )
                 db.session.add(admin)
-                
+
                 # Create recipient
                 test_uuid = str(uuid.uuid4())
                 recipient = Recipients(
-                    r_uuid=test_uuid,
-                    description="Test",
-                    email="test@example.com"
+                    r_uuid=test_uuid, description="Test", email="test@example.com"
                 )
                 db.session.add(recipient)
                 db.session.commit()
-            
+
             # Make request with blocked IP (via X-Forwarded-For)
             response = client.get(
                 f"/img/{test_uuid}",
                 headers={
                     "X-Forwarded-For": "203.0.113.1",
-                    "User-Agent": "Mozilla/5.0 Test"
+                    "User-Agent": "Mozilla/5.0 Test",
                 },
-                base_url="http://local.test"
+                base_url="http://local.test",
             )
             assert response.status_code == 200
-            
+
             # Verify tracking was NOT recorded
             with app.app_context():
                 tracking_count = Tracking.query.count()
-                assert tracking_count == 0, "Tracking should be blocked for IP in blocklist"
+                assert tracking_count == 0, (
+                    "Tracking should be blocked for IP in blocklist"
+                )
 
     def test_tracking_allowed_when_ip_not_in_blocklist(self):
         """Test that tracking is allowed when IP is not in blocklist."""
         app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
         app.config["TESTING"] = True
-        
+
         with app.test_client() as client:
             with app.app_context():
                 db.create_all()
-                
+
                 # Create admin user with IP blocklist
                 admin = AdminUser(
                     email="admin@test.com",
                     oidc_sub="test-sub",
                     roles=["admin"],
-                    ip_blocklist=["203.0.113.1"]
+                    ip_blocklist=["203.0.113.1"],
                 )
                 db.session.add(admin)
-                
+
                 # Create recipient
                 test_uuid = str(uuid.uuid4())
                 recipient = Recipients(
-                    r_uuid=test_uuid,
-                    description="Test",
-                    email="test@example.com"
+                    r_uuid=test_uuid, description="Test", email="test@example.com"
                 )
                 db.session.add(recipient)
                 db.session.commit()
-            
+
             # Make request with different IP
             response = client.get(
                 f"/img/{test_uuid}",
                 headers={
                     "X-Forwarded-For": "8.8.8.8",
-                    "User-Agent": "Mozilla/5.0 Test"
+                    "User-Agent": "Mozilla/5.0 Test",
                 },
-                base_url="http://local.test"
+                base_url="http://local.test",
             )
             assert response.status_code == 200
-            
+
             # Verify tracking WAS recorded
             with app.app_context():
                 tracking_count = Tracking.query.count()
-                assert tracking_count == 1, "Tracking should be recorded for IP not in blocklist"
+                assert tracking_count == 1, (
+                    "Tracking should be recorded for IP not in blocklist"
+                )
 
     def test_tracking_blocked_with_multiple_admins(self):
         """Test IP blocking works when multiple admins have different blocklists."""
         app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
         app.config["TESTING"] = True
-        
+
         with app.test_client() as client:
             with app.app_context():
                 db.create_all()
-                
+
                 # Create two admin users with different blocklists
                 admin1 = AdminUser(
                     email="admin1@test.com",
                     oidc_sub="test-sub-1",
                     roles=["admin"],
-                    ip_blocklist=["192.0.2.1"]
+                    ip_blocklist=["192.0.2.1"],
                 )
                 admin2 = AdminUser(
                     email="admin2@test.com",
                     oidc_sub="test-sub-2",
                     roles=["admin"],
-                    ip_blocklist=["192.0.2.2"]
+                    ip_blocklist=["192.0.2.2"],
                 )
                 db.session.add(admin1)
                 db.session.add(admin2)
-                
+
                 # Create recipient
                 test_uuid = str(uuid.uuid4())
                 recipient = Recipients(
-                    r_uuid=test_uuid,
-                    description="Test",
-                    email="test@example.com"
+                    r_uuid=test_uuid, description="Test", email="test@example.com"
                 )
                 db.session.add(recipient)
                 db.session.commit()
-            
+
             # Request from IP in admin2's blocklist
             response = client.get(
                 f"/img/{test_uuid}",
                 headers={
                     "X-Forwarded-For": "192.0.2.2",
-                    "User-Agent": "Mozilla/5.0 Test"
+                    "User-Agent": "Mozilla/5.0 Test",
                 },
-                base_url="http://local.test"
+                base_url="http://local.test",
             )
             assert response.status_code == 200
-            
+
             # Verify tracking was blocked
             with app.app_context():
                 tracking_count = Tracking.query.count()
@@ -340,55 +332,53 @@ class TestIPBasedFiltering:
         """Test that both cookie and IP filtering work together."""
         app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
         app.config["TESTING"] = True
-        
+
         with app.test_client() as client:
             with app.app_context():
                 db.create_all()
-                
+
                 # Create admin with IP blocklist
                 admin = AdminUser(
                     email="admin@test.com",
                     oidc_sub="test-sub",
                     roles=["admin"],
-                    ip_blocklist=["198.51.100.1"]
+                    ip_blocklist=["198.51.100.1"],
                 )
                 db.session.add(admin)
-                
+
                 # Create recipient
                 test_uuid = str(uuid.uuid4())
                 recipient = Recipients(
-                    r_uuid=test_uuid,
-                    description="Test",
-                    email="test@example.com"
+                    r_uuid=test_uuid, description="Test", email="test@example.com"
                 )
                 db.session.add(recipient)
                 db.session.commit()
-            
+
             # Test 1: Cookie present, IP NOT blocked - should skip tracking
             client.set_cookie("rr_ignore_me", "true", domain="local.test")
             response = client.get(
                 f"/img/{test_uuid}",
                 headers={"User-Agent": "Mozilla/5.0 Test"},
-                base_url="http://local.test"
+                base_url="http://local.test",
             )
             assert response.status_code == 200
-            
+
             with app.app_context():
                 tracking_count = Tracking.query.count()
                 assert tracking_count == 0
-            
+
             # Test 2: No cookie, IP blocked - should skip tracking
             client.set_cookie("rr_ignore_me", "", domain="local.test", max_age=0)
             response = client.get(
                 f"/img/{test_uuid}",
                 headers={
                     "X-Forwarded-For": "198.51.100.1",
-                    "User-Agent": "Mozilla/5.0 Test"
+                    "User-Agent": "Mozilla/5.0 Test",
                 },
-                base_url="http://local.test"
+                base_url="http://local.test",
             )
             assert response.status_code == 200
-            
+
             with app.app_context():
                 tracking_count = Tracking.query.count()
                 assert tracking_count == 0  # Still 0
@@ -401,24 +391,24 @@ class TestAdminUserModel:
         """Test AdminUser model has ip_blocklist field."""
         app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
         app.config["TESTING"] = True
-        
+
         with app.app_context():
             db.create_all()
-            
+
             admin = AdminUser(
                 email="admin@test.com",
                 oidc_sub="test-sub",
                 roles=["admin"],
-                ip_blocklist=["192.168.1.1", "10.0.0.1"]
+                ip_blocklist=["192.168.1.1", "10.0.0.1"],
             )
             db.session.add(admin)
             db.session.commit()
-            
+
             # Query and verify
             retrieved = AdminUser.query.filter_by(email="admin@test.com").first()
             assert retrieved is not None
             assert retrieved.ip_blocklist == ["192.168.1.1", "10.0.0.1"]
-            
+
             db.session.remove()
             db.drop_all()
 
@@ -429,9 +419,9 @@ class TestAdminUserModel:
                 email="admin@test.com",
                 oidc_sub="test-sub",
                 roles=["admin"],
-                ip_blocklist=["1.2.3.4"]
+                ip_blocklist=["1.2.3.4"],
             )
-            
+
             result = admin.to_dict()
             assert "ip_blocklist" in result
             assert result["ip_blocklist"] == ["1.2.3.4"]

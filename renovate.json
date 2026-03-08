@@ -6,7 +6,7 @@
     ":semanticCommitTypeAll(chore)"
   ],
   "labels": ["renovate", "dependencies"],
-  
+
   "packageRules": [
     {
       "description": "Group all Python dependencies into single PR",
@@ -75,22 +75,22 @@
       "automergeStrategy": "squash"
     }
   ],
-  
+
   "platformAutomerge": true,
   "automerge": true,
   "automergeType": "branch",
   "automergeStrategy": "squash",
-  
+
   "requiredStatusChecks": ["ci", "integration-tests"],
-  
+
   "schedule": ["before 6am on Monday"],
-  
+
   "prHourlyLimit": 2,
   "prConcurrentLimit": 10,
-  
+
   "dependencyDashboard": true,
   "dependencyDashboardAutoclose": true,
-  
+
   "vulnerabilityAlerts": {
     "enabled": true,
     "labels": ["security"],

@@ -23,7 +23,7 @@ def upgrade() -> None:
         'admin_user',
         sa.Column('ip_blocklist', sa.JSON(), nullable=True, default=[])
     )
-    
+
     # Set default value for existing rows
     op.execute("UPDATE admin_user SET ip_blocklist = '[]' WHERE ip_blocklist IS NULL")
 

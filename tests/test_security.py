@@ -2,13 +2,13 @@
 Unit tests for security features.
 Covers security headers, rate limiting, input validation, logging hardening, and RBAC.
 """
+
 import json
 import os
-import re
-from datetime import datetime, timedelta
 
 import pytest
-from app import app, db, Recipients, Tracking
+
+from app import Recipients, Tracking, app, db
 
 
 @pytest.fixture
@@ -18,7 +18,7 @@ def client():
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
     app.config["SECRET_KEY"] = "test-secret-key"
     app.config["ADMIN_TOKEN"] = "test-admin-token"
-    
+
     with app.test_client() as client:
         with app.app_context():
             db.create_all()
@@ -40,24 +40,24 @@ class TestSecurityHeaders:
     def test_security_headers_present(self, client):
         """Verify all security headers are present in responses."""
         response = client.get("/")
-        
+
         # Check Content-Security-Policy
         assert "Content-Security-Policy" in response.headers
         assert "default-src 'self'" in response.headers["Content-Security-Policy"]
-        
+
         # Check X-Frame-Options
         assert response.headers.get("X-Frame-Options") == "DENY"
-        
+
         # Check X-Content-Type-Options
         assert response.headers.get("X-Content-Type-Options") == "nosniff"
-        
+
         # Check Strict-Transport-Security
         assert "Strict-Transport-Security" in response.headers
         assert "max-age=31536000" in response.headers["Strict-Transport-Security"]
-        
+
         # Check X-XSS-Protection
         assert response.headers.get("X-XSS-Protection") == "1; mode=block"
-        
+
         # Check Referrer-Policy
         assert "Referrer-Policy" in response.headers
 
@@ -68,9 +68,9 @@ class TestSecurityHeaders:
             recipient = Recipients(r_uuid="test-uuid", email="test@example.com")
             db.session.add(recipient)
             db.session.commit()
-        
+
         response = client.get("/img/test-uuid")
-        
+
         assert "Cache-Control" in response.headers
         assert "no-store" in response.headers["Cache-Control"]
         assert response.headers.get("Pragma") == "no-cache"
@@ -84,12 +84,12 @@ class TestInputValidation:
         # Valid email
         response = client.get("/new-uuid?email=valid@example.com")
         assert response.status_code == 200
-        
+
         # Invalid email format
         response = client.get("/new-uuid?email=invalid-email")
         assert response.status_code == 400
         assert b"Invalid email" in response.data
-        
+
         # Email too long
         long_email = "a" * 250 + "@example.com"
         response = client.get(f"/new-uuid?email={long_email}")
@@ -106,40 +106,37 @@ class TestInputValidation:
     def test_admin_email_validation(self, client, admin_token):
         """Verify email validation on admin recipient creation."""
         headers = {"Authorization": f"Bearer {admin_token}"}
-        
+
         # Invalid email
         response = client.post(
-            "/api/admin/recipients",
-            json={"email": "invalid-email"},
-            headers=headers
+            "/api/admin/recipients", json={"email": "invalid-email"}, headers=headers
         )
         assert response.status_code == 400
 
     def test_request_size_limit(self, client, admin_token):
         """Verify large payloads are rejected."""
-        headers = {"Authorization": f"Bearer {admin_token}", "Content-Type": "application/json"}
-        
+        headers = {
+            "Authorization": f"Bearer {admin_token}",
+            "Content-Type": "application/json",
+        }
+
         # Create large payload (over 100KB)
         large_data = {"description": "x" * 200000}
-        response = client.post(
-            "/api/admin/settings",
-            json=large_data,
-            headers=headers
-        )
+        response = client.post("/api/admin/settings", json=large_data, headers=headers)
         assert response.status_code in [400, 413]
 
     def test_range_parameter_validation(self, client, admin_token):
         """Verify analytics range parameter validation."""
         headers = {"Authorization": f"Bearer {admin_token}"}
-        
+
         # Valid range
         response = client.get("/api/analytics/events?range=7d", headers=headers)
         assert response.status_code == 200
-        
+
         # Invalid format
         response = client.get("/api/analytics/events?range=invalid", headers=headers)
         assert response.status_code == 400
-        
+
         # Out of range
         response = client.get("/api/analytics/events?range=1000d", headers=headers)
         assert response.status_code == 400
@@ -156,16 +153,14 @@ class TestRBAC:
     def test_admin_endpoint_with_invalid_token(self, client):
         """Verify admin endpoints reject invalid tokens."""
         response = client.get(
-            "/api/admin/recipients",
-            headers={"Authorization": "Bearer invalid-token"}
+            "/api/admin/recipients", headers={"Authorization": "Bearer invalid-token"}
         )
         assert response.status_code == 401
 
     def test_admin_endpoint_with_valid_token(self, client, admin_token):
         """Verify admin endpoints accept valid tokens."""
         response = client.get(
-            "/api/admin/recipients",
-            headers={"Authorization": f"Bearer {admin_token}"}
+            "/api/admin/recipients", headers={"Authorization": f"Bearer {admin_token}"}
         )
         assert response.status_code == 200
 
@@ -177,17 +172,11 @@ class TestRBAC:
     def test_admin_login_audit(self, client):
         """Verify admin login attempts are logged."""
         # Failed login
-        response = client.post(
-            "/api/admin/login",
-            json={"token": "wrong-token"}
-        )
+        response = client.post("/api/admin/login", json={"token": "wrong-token"})
         assert response.status_code == 401
-        
+
         # Successful login
-        response = client.post(
-            "/api/admin/login",
-            json={"token": "test-admin-token"}
-        )
+        response = client.post("/api/admin/login", json={"token": "test-admin-token"})
         assert response.status_code == 200
 
     def test_admin_content_type_validation(self, client, admin_token):
@@ -196,7 +185,7 @@ class TestRBAC:
             "/api/admin/recipients",
             data="not json",
             headers={"Authorization": f"Bearer {admin_token}"},
-            content_type="text/plain"
+            content_type="text/plain",
         )
         assert response.status_code == 400
 
@@ -207,14 +196,20 @@ class TestLoggingHardening:
     def test_sensitive_data_filter(self):
         """Verify sensitive data patterns are redacted."""
         from security import SensitiveDataFilter
-        
+
         filter_instance = SensitiveDataFilter()
-        
+
         # Test password redaction
         import logging
+
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="User password=secret123 logged in", args=(), exc_info=None
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="User password=secret123 logged in",
+            args=(),
+            exc_info=None,
         )
         filter_instance.filter(record)
         assert "password=***REDACTED***" in record.msg
@@ -222,27 +217,38 @@ class TestLoggingHardening:
 
     def test_token_redaction(self):
         """Verify tokens are redacted in logs."""
-        from security import SensitiveDataFilter
         import logging
-        
+
+        from security import SensitiveDataFilter
+
         filter_instance = SensitiveDataFilter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="Request with token=abc123xyz", args=(), exc_info=None
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="Request with token=abc123xyz",
+            args=(),
+            exc_info=None,
         )
         filter_instance.filter(record)
         assert "abc123xyz" not in record.msg
 
     def test_bearer_token_redaction(self):
         """Verify Bearer tokens are redacted."""
-        from security import SensitiveDataFilter
         import logging
-        
+
+        from security import SensitiveDataFilter
+
         filter_instance = SensitiveDataFilter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
             msg="Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
-            args=(), exc_info=None
+            args=(),
+            exc_info=None,
         )
         filter_instance.filter(record)
         assert "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" not in record.msg
@@ -255,20 +261,22 @@ class TestTrackingEndpoint:
         """Verify tracking endpoint sanitizes request headers."""
         # Create a test recipient
         with app.app_context():
-            recipient = Recipients(r_uuid="test-uuid-tracking", email="test@example.com")
+            recipient = Recipients(
+                r_uuid="test-uuid-tracking", email="test@example.com"
+            )
             db.session.add(recipient)
             db.session.commit()
-        
+
         # Request with sensitive headers
         response = client.get(
             "/img/test-uuid-tracking",
             headers={
                 "Authorization": "Bearer secret-token",
-                "Cookie": "session=secret123"
-            }
+                "Cookie": "session=secret123",
+            },
         )
         assert response.status_code == 200
-        
+
         # Verify tracking was created
         with app.app_context():
             tracking = Tracking.query.first()
@@ -288,13 +296,15 @@ class TestConfiguration:
             os.environ["ADMIN_TOKEN"] = "custom-admin-token"
             # Reload app to pick up new env var
             from importlib import reload
+
             import app
+
             reload(app)
-            
+
             # Test with new token
             response = client.get(
                 "/api/admin/recipients",
-                headers={"Authorization": "Bearer custom-admin-token"}
+                headers={"Authorization": "Bearer custom-admin-token"},
             )
             assert response.status_code == 200
         finally:

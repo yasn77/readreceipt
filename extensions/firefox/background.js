@@ -19,7 +19,7 @@ const MAX_BLOCKED_REQUESTS = 100;
  */
 function isSentFolder(url) {
   if (!url) return false;
-  
+
   // Gmail sent folder patterns
   const gmailSentPatterns = [
     '#sent',
@@ -29,7 +29,7 @@ function isSentFolder(url) {
     '/search/category:sent',
     '#search/category%3Asent'
   ];
-  
+
   // Outlook sent folder patterns
   const outlookSentPatterns = [
     '/sentitems',
@@ -38,15 +38,15 @@ function isSentFolder(url) {
     '/drafts-sentitems',
     'view=Sent'
   ];
-  
+
   for (const pattern of gmailSentPatterns) {
     if (url.includes(pattern)) return true;
   }
-  
+
   for (const pattern of outlookSentPatterns) {
     if (url.includes(pattern)) return true;
   }
-  
+
   return false;
 }
 
@@ -72,17 +72,17 @@ function logBlockedRequest(requestDetails) {
     tabId: requestDetails.tabId,
     type: requestDetails.type
   };
-  
+
   blockedRequests.unshift(logEntry);
-  
+
   // Keep only the most recent entries
   if (blockedRequests.length > MAX_BLOCKED_REQUESTS) {
     blockedRequests = blockedRequests.slice(0, MAX_BLOCKED_REQUESTS);
   }
-  
+
   // Update storage for popup to access
   chrome.storage.local.set({ blockedRequests });
-  
+
   console.log('[ReadReceipt] Blocked tracking pixel:', requestDetails.url);
 }
 
@@ -95,7 +95,7 @@ function initBlocking() {
     blockingEnabled = result.blockingEnabled !== false;
     console.log('[ReadReceipt] Blocking enabled:', blockingEnabled);
   });
-  
+
   // Listen for settings changes
   chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace === 'sync' && changes.blockingEnabled) {
@@ -103,40 +103,40 @@ function initBlocking() {
       console.log('[ReadReceipt] Blocking toggled:', blockingEnabled);
     }
   });
-  
+
   // Install webRequest blocking listener
   chrome.webRequest.onBeforeRequest.addListener(
     (details) => {
       if (!blockingEnabled) {
         return {};
       }
-      
+
       // Check if this is a tracking pixel
       if (!isTrackingPixel(details.url)) {
         return {};
       }
-      
+
       // Get the tab to check if it's viewing sent folder
       if (!details.tabId || details.tabId === -1) {
         return {}; // Can't determine tab context
       }
-      
+
       chrome.tabs.get(details.tabId, (tab) => {
         if (chrome.runtime.lastError) {
           console.error('[ReadReceipt] Error getting tab:', chrome.runtime.lastError);
           return;
         }
-        
+
         if (tab.url && isSentFolder(tab.url)) {
           logBlockedRequest(details);
           console.log('[ReadReceipt] Blocking pixel - user is in sent folder');
         }
       });
-      
+
       if (tab && tab.url && isSentFolder(tab.url)) {
         return { cancel: true };
       }
-      
+
       return {};
     },
     {
@@ -148,7 +148,7 @@ function initBlocking() {
     },
     ['blocking']
   );
-  
+
   console.log('[ReadReceipt] webRequest blocking initialized');
 }
 
@@ -164,20 +164,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'getBlockedRequests') {
     sendResponse({ blockedRequests });
   }
-  
+
   if (message.action === 'clearBlockedRequests') {
     blockedRequests = [];
     chrome.storage.local.set({ blockedRequests });
     sendResponse({ status: 'success' });
   }
-  
+
   if (message.action === 'getStatus') {
-    sendResponse({ 
+    sendResponse({
       blockingEnabled,
-      blockedCount: blockedRequests.length 
+      blockedCount: blockedRequests.length
     });
   }
-  
+
   return true;
 });
 

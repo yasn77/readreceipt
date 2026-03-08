@@ -81,7 +81,7 @@ describe('Extension Pixel Blocking', () => {
   describe('isSentFolder', () => {
     const isSentFolder = (url) => {
       if (!url) return false;
-      
+
       const gmailSentPatterns = [
         '#sent',
         '#sent/1',
@@ -90,7 +90,7 @@ describe('Extension Pixel Blocking', () => {
         '/search/category:sent',
         '#search/category%3Asent'
       ];
-      
+
       const outlookSentPatterns = [
         '/sentitems',
         '/SentItems',
@@ -98,15 +98,15 @@ describe('Extension Pixel Blocking', () => {
         '/drafts-sentitems',
         'view=Sent'
       ];
-      
+
       for (const pattern of gmailSentPatterns) {
         if (url.includes(pattern)) return true;
       }
-      
+
       for (const pattern of outlookSentPatterns) {
         if (url.includes(pattern)) return true;
       }
-      
+
       return false;
     };
 
@@ -179,11 +179,11 @@ describe('Extension Pixel Blocking', () => {
     test('should respect blockingEnabled setting', () => {
       // When blocking is disabled, no blocking should occur
       blockingEnabled = false;
-      
-      const shouldBlock = blockingEnabled && 
+
+      const shouldBlock = blockingEnabled &&
                          isTrackingPixel('https://example.com/img/123e4567-e89b-12d3-a456-426614174000') &&
                          isSentFolder('https://mail.google.com/mail/u/0/#sent');
-      
+
       expect(shouldBlock).toBe(false);
     });
   });
@@ -274,7 +274,7 @@ function isTrackingPixel(url) {
 
 function isSentFolder(url) {
   if (!url) return false;
-  
+
   const gmailSentPatterns = [
     '#sent',
     '#sent/1',
@@ -283,7 +283,7 @@ function isSentFolder(url) {
     '/search/category:sent',
     '#search/category%3Asent'
   ];
-  
+
   const outlookSentPatterns = [
     '/sentitems',
     '/SentItems',
@@ -291,14 +291,14 @@ function isSentFolder(url) {
     '/drafts-sentitems',
     'view=Sent'
   ];
-  
+
   for (const pattern of gmailSentPatterns) {
     if (url.includes(pattern)) return true;
   }
-  
+
   for (const pattern of outlookSentPatterns) {
     if (url.includes(pattern)) return true;
   }
-  
+
   return false;
 }
