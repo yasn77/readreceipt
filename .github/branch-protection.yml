@@ -1,0 +1,63 @@
+# Branch protection rules for auto-merge and CI requirements
+# This file documents the branch protection settings needed for Renovate auto-merge
+
+# Note: Branch protection rules must be configured in GitHub Settings
+# This file serves as documentation and can be used with GitHub API or CLI
+
+# Required settings for main/master branch:
+# 1. Require pull request reviews before merging: 1 review
+# 2. Require status checks to pass before merging: ENABLED
+# 3. Required status checks:
+#    - ci (backend-tests, frontend-tests, extension-tests, security-scan)
+#    - integration-tests
+# 4. Require branches to be up to date before merging: ENABLED
+# 5. Allow auto-merge: ENABLED
+# 6. Allow squash merge: ENABLED (default merge method)
+# 7. Allow merge commits: DISABLED
+# 8. Allow rebase merge: DISABLED
+
+# For Renovate auto-merge to work:
+# - "Allow auto-merge" must be enabled
+# - Required status checks must be configured
+# - Branch must be up to date before merging
+
+# To configure via GitHub CLI:
+# gh api repos/yasn77/readreceipt/branches/master/protection \
+#   -X PUT \
+#   -f required_status_checks='{"strict":true,"contexts":["ci","integration-tests"]}' \
+#   -f enforce_admins=true \
+#   -f required_pull_request_reviews='{"required_approving_review_count":1,"dismiss_stale_reviews":true}' \
+#   -f allow_auto_merge=true
+
+# Protected branches configuration
+master:
+  required_status_checks:
+    strict: true
+    contexts:
+      - ci
+      - integration-tests
+  enforce_admins: true
+  required_pull_request_reviews:
+    required_approving_review_count: 1
+    dismiss_stale_reviews: true
+    require_code_owner_reviews: false
+  allow_auto_merge: true
+  allow_squash_merge: true
+  allow_merge_commit: false
+  allow_rebase_merge: false
+
+main:
+  required_status_checks:
+    strict: true
+    contexts:
+      - ci
+      - integration-tests
+  enforce_admins: true
+  required_pull_request_reviews:
+    required_approving_review_count: 1
+    dismiss_stale_reviews: true
+    require_code_owner_reviews: false
+  allow_auto_merge: true
+  allow_squash_merge: true
+  allow_merge_commit: false
+  allow_rebase_merge: false

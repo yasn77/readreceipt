@@ -125,6 +125,9 @@ class AdminUser(db.Model):  # type: ignore[name-defined]
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
     last_login = db.Column(db.DateTime)
+    ip_blocklist = db.Column(
+        db.JSON, default=list
+    )  # List of blocked IP addresses (IPv4 and IPv6)
 
     def __repr__(self) -> str:
         return f"<AdminUser {self.email}>"
@@ -143,6 +146,7 @@ class AdminUser(db.Model):  # type: ignore[name-defined]
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "last_login": self.last_login.isoformat() if self.last_login else None,
+            "ip_blocklist": self.ip_blocklist or [],
         }
 
 
@@ -410,6 +414,34 @@ def send_img(this_uuid: str) -> Any:
     if r_model is None:
         return json.jsonify({"error": "Recipient not found"}), 404
 
+    # Get the requesting IP address from headers (supports proxies)
+    # Check X-Forwarded-For header first (for proxied requests)
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        # X-Forwarded-For can contain multiple IPs, take the first one
+        requesting_ip = forwarded_for.split(",")[0].strip()
+    else:
+        requesting_ip = request.remote_addr
+
+    # Issue #151: IP-based own-open filtering
+    # Check if requesting IP is in any admin user's blocklist
+    ip_blocked = False
+    admin_users = AdminUser.query.filter(AdminUser.ip_blocklist != None).all()
+    for admin_user in admin_users:
+        if admin_user.ip_blocklist and requesting_ip in admin_user.ip_blocklist:
+            ip_blocked = True
+            app.logger.info(
+                f"IP-based filtering: Blocked tracking for UUID {this_uuid[:8]}... "
+                f"- IP {requesting_ip} is in blocklist for user {admin_user.email}"
+            )
+            # Log audit event for IP block
+            log_audit(
+                admin_user, 
+                "ip_block_triggered", 
+                {"blocked_ip": requesting_ip, "uuid": this_uuid}
+            )
+            break
+
     # Build details with sanitized data (Issue #107, #108)
     details: dict[str, Any] = {}
     
@@ -451,7 +483,7 @@ def send_img(this_uuid: str) -> Any:
     details["date"] = datetime.now().isoformat()
 
     # Log tracking event safely (Issue #108)
-    app.logger.info(f"Tracking event for UUID: {this_uuid[:8]}... from {request.remote_addr}")
+    app.logger.info(f"Tracking event for UUID: {this_uuid[:8]}... from {requesting_ip}")
 
     img_io = io.BytesIO()
     img = Image.new("RGBA", (1, 1), (255, 255, 255, 0))
@@ -460,17 +492,37 @@ def send_img(this_uuid: str) -> Any:
 
     ua = user_agent_parser.Parse(details["user_agent"])
 
-    if not ua["user_agent"]["family"] == "GmailImageProxy":
+    # Issue #150: Cookie-based own-open filtering
+    # Check if rr_ignore_me cookie is present - if so, skip tracking
+    rr_ignore_me = request.cookies.get("rr_ignore_me")
+    if rr_ignore_me:
+        app.logger.info(f"Skipping tracking for UUID {this_uuid[:8]}... - rr_ignore_me cookie present")
+
+    # Only record tracking if:
+    # 1. Not Gmail's proxy (existing check)
+    # 2. rr_ignore_me cookie is NOT present (Issue #150)
+    # 3. Requesting IP is NOT in any admin's blocklist (Issue #151)
+    if (
+        not ua["user_agent"]["family"] == "GmailImageProxy" 
+        and not rr_ignore_me 
+        and not ip_blocked
+    ):
         entry = Tracking(
             recipients_id=r_model.id,
             timestamp=datetime.now(),
             ip_country=request.headers.get("Cf-Ipcountry"),
-            connecting_ip=request.headers.get("Cf-Connecting-Ip"),
+            connecting_ip=requesting_ip,
             user_agent=details["user_agent"],
             details=json.dumps(details),
         )
         db.session.add(entry)
         db.session.commit()
+    else:
+        app.logger.info(
+            f"Tracking skipped for UUID {this_uuid[:8]}... - "
+            f"GmailProxy={ua['user_agent']['family'] == 'GmailImageProxy'}, "
+            f"Cookie={rr_ignore_me is not None}, IPBlocked={ip_blocked}"
+        )
 
     return send_file(img_io, download_name="1.png", mimetype="image/png")  # type: ignore[call-arg]
 
@@ -1062,6 +1114,7 @@ def get_settings() -> Any:
                 "tracking_enabled": True,
                 "allowed_domains": os.environ.get("EXTENSION_ALLOWED_ORIGINS", ""),
                 "log_level": os.environ.get("LOG_LEVEL", "INFO"),
+                "cookie_filtering_enabled": os.environ.get("COOKIE_FILTERING_ENABLED", "true").lower() == "true",
             }
         ),
         200,
@@ -1093,6 +1146,157 @@ def update_settings() -> Any:
     app.logger.info(f"AUDIT: Settings updated by admin - keys: {list(safe_data.keys())}")
     
     return json.jsonify({"status": "updated", "settings": safe_data}), 200
+
+
+# ============================================================================
+# IP Blocklist Management Endpoints (Issue #151)
+# ============================================================================
+
+@app.route("/api/admin/ip-blocklist", methods=["GET"])
+@admin_required
+def get_ip_blocklist() -> Any:
+    """Get the current user's IP blocklist."""
+    admin_user = getattr(request, "current_admin_user", None)
+    if not admin_user:
+        return json.jsonify({"error": "Admin user not found"}), 404
+    
+    return json.jsonify({
+        "ip_blocklist": admin_user.ip_blocklist or [],
+        "count": len(admin_user.ip_blocklist or [])
+    }), 200
+
+
+@app.route("/api/admin/ip-blocklist", methods=["POST"])
+@admin_required
+def add_to_ip_blocklist() -> Any:
+    """Add an IP address to the blocklist."""
+    admin_user = getattr(request, "current_admin_user", None)
+    if not admin_user:
+        return json.jsonify({"error": "Admin user not found"}), 404
+    
+    # Validate request data
+    if not request.is_json:
+        return json.jsonify({"error": "Content-Type must be application/json"}), 400
+    
+    data = request.get_json()
+    if not data or "ip_address" not in data:
+        return json.jsonify({"error": "ip_address is required"}), 400
+    
+    ip_address = data["ip_address"].strip()
+    
+    # Validate IP address format (IPv4 or IPv6)
+    import ipaddress
+    try:
+        ipaddress.ip_address(ip_address)
+    except ValueError:
+        return json.jsonify({"error": "Invalid IP address format"}), 400
+    
+    # Initialize blocklist if None
+    if admin_user.ip_blocklist is None:
+        admin_user.ip_blocklist = []
+    
+    # Check if IP already in blocklist
+    if ip_address in admin_user.ip_blocklist:
+        return json.jsonify({"error": "IP address already in blocklist"}), 409
+    
+    # Add IP to blocklist
+    admin_user.ip_blocklist.append(ip_address)
+    admin_user.updated_at = datetime.utcnow()
+    db.session.commit()
+    
+    # Audit the change
+    log_audit(
+        admin_user,
+        "ip_blocklist_add",
+        {"ip_address": ip_address, "total_blocked": len(admin_user.ip_blocklist)}
+    )
+    
+    app.logger.info(
+        f"AUDIT: IP {ip_address} added to blocklist by {admin_user.email}"
+    )
+    
+    return json.jsonify({
+        "status": "added",
+        "ip_address": ip_address,
+        "total_blocked": len(admin_user.ip_blocklist)
+    }), 201
+
+
+@app.route("/api/admin/ip-blocklist/<ip_address>", methods=["DELETE"])
+@admin_required
+def remove_from_ip_blocklist(ip_address: str) -> Any:
+    """Remove an IP address from the blocklist."""
+    admin_user = getattr(request, "current_admin_user", None)
+    if not admin_user:
+        return json.jsonify({"error": "Admin user not found"}), 404
+    
+    # Validate IP address format
+    import ipaddress
+    try:
+        ipaddress.ip_address(ip_address)
+    except ValueError:
+        return json.jsonify({"error": "Invalid IP address format"}), 400
+    
+    # Initialize blocklist if None
+    if admin_user.ip_blocklist is None:
+        admin_user.ip_blocklist = []
+    
+    # Check if IP is in blocklist
+    if ip_address not in admin_user.ip_blocklist:
+        return json.jsonify({"error": "IP address not in blocklist"}), 404
+    
+    # Remove IP from blocklist
+    admin_user.ip_blocklist.remove(ip_address)
+    admin_user.updated_at = datetime.utcnow()
+    db.session.commit()
+    
+    # Audit the change
+    log_audit(
+        admin_user,
+        "ip_blocklist_remove",
+        {"ip_address": ip_address, "total_blocked": len(admin_user.ip_blocklist)}
+    )
+    
+    app.logger.info(
+        f"AUDIT: IP {ip_address} removed from blocklist by {admin_user.email}"
+    )
+    
+    return json.jsonify({
+        "status": "removed",
+        "ip_address": ip_address,
+        "total_blocked": len(admin_user.ip_blocklist)
+    }), 200
+
+
+@app.route("/api/admin/ip-blocklist/validate", methods=["POST"])
+@admin_required
+def validate_ip_address() -> Any:
+    """Validate an IP address format without adding to blocklist."""
+    if not request.is_json:
+        return json.jsonify({"error": "Content-Type must be application/json"}), 400
+    
+    data = request.get_json()
+    if not data or "ip_address" not in data:
+        return json.jsonify({"error": "ip_address is required"}), 400
+    
+    ip_address = data["ip_address"].strip()
+    
+    # Validate IP address format
+    import ipaddress
+    try:
+        parsed = ipaddress.ip_address(ip_address)
+        ip_version = "IPv6" if parsed.version == 6 else "IPv4"
+        return json.jsonify({
+            "valid": True,
+            "ip_address": ip_address,
+            "version": ip_version,
+            "normalized": str(parsed)
+        }), 200
+    except ValueError:
+        return json.jsonify({
+            "valid": False,
+            "error": "Invalid IP address format. Use IPv4 (e.g., 192.168.1.1) or IPv6 (e.g., 2001:db8::1)"
+        }), 400
 
 
 @app.route("/api/analytics/summary", methods=["GET"])
@@ -1283,3 +1487,43 @@ def export_analytics() -> Any:
             "Content-Disposition": "attachment; filename=analytics_export.csv",
         },
     )
+
+
+# ============================================================================
+# Cookie-Based Own-Open Filtering Endpoints (Issue #150)
+# ============================================================================
+
+
+@app.route("/api/cookie/set", methods=["POST"])
+def set_ignore_cookie() -> Any:
+    """Set the rr_ignore_me cookie to prevent tracking when viewing sent folder.
+    
+    This endpoint is called by the admin dashboard when the user enables
+    cookie-based own-open filtering (Issue #150).
+    """
+    response = make_response(json.jsonify({"status": "cookie_set"}), 200)
+    # Set cookie for 30 days, secure and httponly for security
+    response.set_cookie(
+        "rr_ignore_me",
+        "true",
+        max_age=30 * 24 * 60 * 60,  # 30 days
+        httponly=True,
+        secure=request.is_secure,
+        samesite="Lax",
+    )
+    return response
+
+
+@app.route("/api/cookie/clear", methods=["POST"])
+def clear_ignore_cookie() -> Any:
+    """Clear the rr_ignore_me cookie to re-enable tracking."""
+    response = make_response(json.jsonify({"status": "cookie_cleared"}), 200)
+    response.set_cookie(
+        "rr_ignore_me",
+        "",
+        max_age=0,
+        httponly=True,
+        secure=request.is_secure,
+        samesite="Lax",
+    )
+    return response
