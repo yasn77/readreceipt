@@ -293,6 +293,83 @@ All PRs trigger the CI pipeline:
 3. Coverage check (>90%)
 4. Build validation
 
+### CI Pipeline Matrix
+
+Our CI runs tests across multiple versions:
+
+- **Python**: 3.11, 3.12, 3.13
+- **Node.js**: 18, 20, 22
+
+### Workflows
+
+- **CI** (`.github/workflows/ci.yml`): Main pipeline with linting, testing, and coverage
+- **Integration Tests** (`.github/workflows/integration-tests.yml`): End-to-end integration tests
+- **Security Scan** (`.github/workflows/security-scan.yml`): Automated security scanning
+
+### CI Status Badge
+
+[![CI](https://github.com/yasn77/readreceipt/actions/workflows/ci.yml/badge.svg)](https://github.com/yasn77/readreceipt/actions/workflows/ci.yml)
+
+## Dependency Management with Renovate
+
+We use [Renovate](https://renovatebot.com/) to automate dependency updates. Renovate creates PRs for:
+
+- Python dependencies (requirements.txt)
+- Node.js dependencies (package.json)
+- GitHub Actions versions
+- Docker images
+
+### Renovate Configuration
+
+Renovate is configured in `.github/renovate.json` with the following rules:
+
+**Grouped Updates:**
+- Python dependencies → Single PR for all Python deps
+- Node.js dependencies → Single PR for all Node.js deps
+- GitHub Actions → Single PR for action updates
+- Docker images → Single PR for image updates
+
+**Auto-Merge:**
+- ✅ Patch updates: Auto-merged after CI passes
+- ✅ Minor updates: Auto-merged after CI passes
+- ⚠️ Major updates: Require manual review
+- ⚠️ Security updates: Require manual review (labeled as `security`)
+
+**Required Status Checks:**
+All auto-merge PRs must pass:
+- `ci` (all matrix jobs)
+- `integration-tests`
+
+### Branch Protection
+
+Auto-merge requires branch protection rules:
+1. Required status checks: `ci`, `integration-tests`
+2. Allow auto-merge: Enabled
+3. Squash merge: Enabled (default)
+
+To configure via GitHub CLI:
+```bash
+gh api repos/yasn77/readreceipt/branches/master/protection \
+  -X PUT \
+  -f required_status_checks='{"strict":true,"contexts":["ci","integration-tests"]}' \
+  -f allow_auto_merge=true
+```
+
+See `.github/branch-protection.yml` for full documentation.
+
+### Manual Renovate Actions
+
+```bash
+# Check Renovate status
+# Visit: https://github.com/yasn77/readreceipt/issues (Renovate dashboard)
+
+# Manually trigger Renovate
+# Add label: renovate to any PR
+
+# Close a Renovate PR to ignore an update
+# Add comment: ignore this major version
+```
+
 ## Questions?
 
 Feel free to open an issue with the "question" label for any questions about contributing.
