@@ -92,7 +92,7 @@ function IPFiltering() {
     try {
       // First validate the IP
       const validation = await validateIp(newIp.trim());
-      
+
       if (!validation.valid) {
         setValidationError(validation.message);
         setSaving(false);
@@ -192,8 +192,8 @@ function IPFiltering() {
 
       {message.text && (
         <div className={`mb-4 p-4 rounded-md ${
-          message.type === 'success' 
-            ? 'bg-green-50 border border-green-200 text-green-800' 
+          message.type === 'success'
+            ? 'bg-green-50 border border-green-200 text-green-800'
             : 'bg-red-50 border border-red-200 text-red-800'
         }`}>
           {message.text}
@@ -206,7 +206,7 @@ function IPFiltering() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
             Add IP to Blocklist
           </h2>
-          
+
           <form onSubmit={handleAddIp}>
             <div className="mb-4">
               <label htmlFor="ipAddress" className="block text-sm font-medium text-gray-700 mb-2">
@@ -224,11 +224,11 @@ function IPFiltering() {
                     : 'border-gray-300 focus:ring-blue-200'
                 }`}
               />
-              
+
               {validationError && (
                 <p className="mt-2 text-sm text-red-600">{validationError}</p>
               )}
-              
+
               {validationSuccess && (
                 <p className="mt-2 text-sm text-green-600">{validationSuccess}</p>
               )}
@@ -246,7 +246,7 @@ function IPFiltering() {
           <div className="mt-4 p-3 bg-blue-50 rounded-md">
             <h3 className="text-sm font-medium text-blue-900 mb-1">What does this do?</h3>
             <p className="text-sm text-blue-700">
-              When you view your sent emails, tracking pixels will be blocked if the request 
+              When you view your sent emails, tracking pixels will be blocked if the request
               comes from a blocked IP address. This prevents your own opens from being recorded.
             </p>
           </div>
@@ -299,7 +299,7 @@ function IPFiltering() {
       {/* Help Section */}
       <div className="mt-6 bg-white p-6 rounded-lg shadow">
         <h2 className="text-lg font-semibold text-gray-900 mb-3">Help & Information</h2>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <h3 className="text-sm font-medium text-gray-900 mb-2">How it works</h3>
@@ -310,7 +310,7 @@ function IPFiltering() {
               <li>• All blocklist changes are audited</li>
             </ul>
           </div>
-          
+
           <div>
             <h3 className="text-sm font-medium text-gray-900 mb-2">Example IPs</h3>
             <ul className="text-sm text-gray-600 space-y-1">

@@ -129,22 +129,23 @@ class TestCookieBasedFiltering:
         """Test that tracking is skipped when rr_ignore_me cookie is present."""
         app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
         app.config["TESTING"] = True
-        
+
         with app.test_client() as client:
             with app.app_context():
                 db.create_all()
                 # Create sample recipient
                 import uuid
+
                 test_uuid = str(uuid.uuid4())
                 recipient = Recipients(
                     r_uuid=test_uuid, description="Test", email="test@example.com"
                 )
                 db.session.add(recipient)
                 db.session.commit()
-            
+
             # Set cookie on client (Flask 3.x API) - use local.test for test client
             client.set_cookie("rr_ignore_me", "true", domain="local.test")
-            
+
             # Make request with cookie - specify SERVER_NAME to match domain
             response = client.get(
                 f"/img/{test_uuid}",
@@ -157,25 +158,28 @@ class TestCookieBasedFiltering:
             # Verify NO tracking was recorded
             with app.app_context():
                 tracking_count = Tracking.query.count()
-                assert tracking_count == 0, "Tracking should be skipped when cookie is present"
+                assert tracking_count == 0, (
+                    "Tracking should be skipped when cookie is present"
+                )
 
     def test_tracking_recorded_without_cookie(self) -> None:
         """Test that tracking is recorded when rr_ignore_me cookie is NOT present."""
         app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
         app.config["TESTING"] = True
-        
+
         with app.test_client() as client:
             with app.app_context():
                 db.create_all()
                 # Create sample recipient
                 import uuid
+
                 test_uuid = str(uuid.uuid4())
                 recipient = Recipients(
                     r_uuid=test_uuid, description="Test", email="test@example.com"
                 )
                 db.session.add(recipient)
                 db.session.commit()
-            
+
             # Make request without setting cookie
             response = client.get(
                 f"/img/{test_uuid}",
@@ -187,7 +191,9 @@ class TestCookieBasedFiltering:
             # Verify tracking WAS recorded
             with app.app_context():
                 tracking_count = Tracking.query.count()
-                assert tracking_count == 1, "Tracking should be recorded when cookie is absent"
+                assert tracking_count == 1, (
+                    "Tracking should be recorded when cookie is absent"
+                )
 
     def test_set_ignore_cookie_endpoint(self, client: Any) -> None:
         """Test the /api/cookie/set endpoint."""

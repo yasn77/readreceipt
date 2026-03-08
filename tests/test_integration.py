@@ -5,7 +5,6 @@ and that all critical endpoints are functional.
 """
 
 import os
-import sys
 from collections.abc import Generator
 from typing import Any
 
@@ -88,7 +87,7 @@ class TestHealthCheck:
     def test_db_connection_works(self, integration_client: Any) -> None:
         """Test that database connection is functional."""
         from sqlalchemy import text
-        
+
         with app.app_context():
             # Try a simple query
             result = db.session.execute(text("SELECT 1"))
@@ -97,14 +96,14 @@ class TestHealthCheck:
 
 class TestOIDCEndpoints:
     """Integration tests for OIDC endpoints.
-    
+
     Note: These tests will fail if OIDC provider is not properly initialized.
     This is intentional - we want to catch missing OIDC configuration.
     """
 
     def test_oidc_authorize_endpoint_exists(self, integration_client: Any) -> None:
         """Test that OIDC authorize endpoint is accessible.
-        
+
         This test documents whether OIDC provider routes are registered.
         Note: This test expects 404 if OIDC is not implemented.
         """
@@ -112,6 +111,7 @@ class TestOIDCEndpoints:
         # If 404, OIDC is not implemented - this is expected for now
         if response.status_code == 404:
             import warnings
+
             warnings.warn(
                 "OIDC authorize endpoint returns 404. "
                 "OIDC provider not initialized. Add 'oidc = OIDCProvider(app)' to fix."
@@ -126,6 +126,7 @@ class TestOIDCEndpoints:
         # Should not return 404 if OIDC is properly configured
         if response.status_code == 404:
             import warnings
+
             warnings.warn(
                 "OIDC discovery endpoint not found. OIDC provider may not be initialized."
             )
@@ -150,7 +151,7 @@ class TestAdminEndpoints:
     def test_admin_login_with_valid_token(self, admin_client: Any) -> None:
         """Test successful admin login with valid token."""
         os.environ["ADMIN_TOKEN"] = "integration-test-token"
-        
+
         response = admin_client.post(
             "/api/admin/login",
             json={"token": "integration-test-token"},
@@ -173,12 +174,12 @@ class TestAdminEndpoints:
     def test_admin_recipients_with_auth(self, admin_client: Any) -> None:
         """Test admin recipients endpoint with valid authentication."""
         os.environ["ADMIN_TOKEN"] = "integration-test-token"
-        
+
         # Access recipients with valid auth header
         # Note: require_admin decorator checks Authorization header
         response = admin_client.get(
             "/api/admin/recipients",
-            headers={"Authorization": "Bearer integration-test-token"}
+            headers={"Authorization": "Bearer integration-test-token"},
         )
         # Should succeed with valid auth
         assert response.status_code == 200, f"Should access recipients: {response.data}"
@@ -196,12 +197,15 @@ class TestAPIEndpoints:
     def test_img_endpoint_with_valid_uuid(self, integration_client: Any) -> None:
         """Test image endpoint with a valid UUID."""
         # First create a recipient
-        response = integration_client.get("/new-uuid?description=test&email=test@example.com")
+        response = integration_client.get(
+            "/new-uuid?description=test&email=test@example.com"
+        )
         assert response.status_code == 200
-        
+
         # Extract UUID from response (it's in the HTML)
         import re
-        match = re.search(r'<p>([a-f0-9-]+)<p>', response.data.decode())
+
+        match = re.search(r"<p>([a-f0-9-]+)<p>", response.data.decode())
         if match:
             uuid = match.group(1)
             img_response = integration_client.get(f"/img/{uuid}")
