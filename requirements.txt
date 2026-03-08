@@ -38,5 +38,5 @@ pre-commit==4.5.1
 prometheus-flask-exporter==0.23.2
 
 # Security scanning
-safety==3.5.2
+safety==3.7.0
 bandit==1.9.4
