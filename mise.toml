@@ -1,5 +1,5 @@
 [tools]
-python = "3.11"
+python = "3.14.3"
 node = "20"
 uv = "latest"
 npm = "latest"
@@ -96,4 +96,3 @@ mise run lint
 mise run test
 mise run build
 """, description = "Run full CI pipeline (lint + test + build)" }
-

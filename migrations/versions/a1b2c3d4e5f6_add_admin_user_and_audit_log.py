@@ -55,7 +55,7 @@ def downgrade():
     op.drop_index('ix_audit_log_admin_user_id', table_name='audit_log')
     op.drop_index('ix_audit_log_timestamp', table_name='audit_log')
     op.drop_table('audit_log')
-    
+
     op.drop_index('ix_admin_user_oidc_sub', table_name='admin_user')
     op.drop_index('ix_admin_user_email', table_name='admin_user')
     op.drop_table('admin_user')

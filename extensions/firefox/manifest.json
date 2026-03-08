@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
   "name": "Read Receipt",
-  "version": "0.2.0",
-  "description": "Enable read receipts for webmail services",
+  "version": "0.3.0",
+  "description": "Enable read receipts for webmail services with own-open filtering",
   "background": {
     "scripts": ["background.js"],
     "persistent": false
@@ -23,6 +23,8 @@
     "tabs",
     "storage",
     "activeTab",
+    "webRequest",
+    "webRequestBlocking",
     "https://mail.google.com/*",
     "https://outlook.live.com/*",
     "https://*.yahoo.com/*"

@@ -2,6 +2,7 @@
 Security middleware and utilities for ReadReceipt application.
 Implements security headers, rate limiting, input validation, logging hardening, and RBAC.
 """
+
 from __future__ import annotations
 
 import functools
@@ -9,8 +10,9 @@ import json
 import logging
 import os
 import re
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any
 
 import bleach
 from flask import Flask, g, jsonify, request
@@ -26,10 +28,16 @@ class SensitiveDataFilter(logging.Filter):
     # Patterns to redact
     SENSITIVE_PATTERNS = [
         (r"(?i)(password|passwd|pwd)[^=]*[:=]\s*[^\s,;]+", r"\1=***REDACTED***"),
-        (r"(?i)(token|api[_-]?key|secret[_-]?key|auth[_-]?token)[^=]*[:=]\s*[^\s,;]+", r"\1=***REDACTED***"),
+        (
+            r"(?i)(token|api[_-]?key|secret[_-]?key|auth[_-]?token)[^=]*[:=]\s*[^\s,;]+",
+            r"\1=***REDACTED***",
+        ),
         (r"(?i)(bearer\s+)[a-zA-Z0-9\-_\.]+", r"\1***REDACTED***"),
         (r"(?i)(email|e-mail)[^=]*[:=]\s*[^\s,;]+", r"\1=***REDACTED***"),
-        (r"(?i)(connecting-ip|cf-connecting-ip|x-forwarded-for)[^=]*[:=]\s*[^\s,;]+", r"\1=***REDACTED***"),
+        (
+            r"(?i)(connecting-ip|cf-connecting-ip|x-forwarded-for)[^=]*[:=]\s*[^\s,;]+",
+            r"\1=***REDACTED***",
+        ),
     ]
 
     def filter(self, record: logging.LogRecord) -> bool:
@@ -43,7 +51,9 @@ class SensitiveDataFilter(logging.Filter):
         # Also sanitize args if present
         if record.args:
             if isinstance(record.args, dict):
-                record.args = {k: self._sanitize_value(v) for k, v in record.args.items()}
+                record.args = {
+                    k: self._sanitize_value(v) for k, v in record.args.items()
+                }
             elif isinstance(record.args, tuple):
                 record.args = tuple(self._sanitize_value(arg) for arg in record.args)
 
@@ -200,9 +210,7 @@ def setup_input_validation(app: Flask) -> None:
         user_agent = request.headers.get("User-Agent", "")
         if len(user_agent) > MAX_USER_AGENT_LENGTH:
             # Trim but log the attempt
-            logger.warning(
-                f"User-Agent too long: {len(user_agent)} chars, truncated"
-            )
+            logger.warning(f"User-Agent too long: {len(user_agent)} chars, truncated")
 
         # Validate headers don't contain dangerous content
         for header_name, header_value in request.headers:
@@ -229,8 +237,10 @@ def setup_input_validation(app: Flask) -> None:
                 cleaned[k] = sanitize_dict(v)
             elif isinstance(v, list):
                 cleaned[k] = [
-                    sanitize_dict(i) if isinstance(i, dict)
-                    else sanitize_string(i) if isinstance(i, str)
+                    sanitize_dict(i)
+                    if isinstance(i, dict)
+                    else sanitize_string(i)
+                    if isinstance(i, str)
                     else i
                     for i in v
                 ]

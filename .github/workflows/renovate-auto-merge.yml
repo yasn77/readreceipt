@@ -6,7 +6,7 @@ on:
 
 jobs:
   auto-merge:
-    runs-on: ubuntu-latest
+    runs-on: readreceipt
     if: github.actor == 'renovate[bot]'
     steps:
       - name: Checkout code
