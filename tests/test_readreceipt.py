@@ -197,7 +197,7 @@ class TestCookieBasedFiltering:
 
     def test_set_ignore_cookie_endpoint(self, client: Any) -> None:
         """Test the /api/cookie/set endpoint."""
-        response = client.post("/api/cookie/set")
+        response = client.post("/api/cookie/set", headers=auth_headers())
         assert response.status_code == 200
         data = response.get_json()
         assert data["status"] == "cookie_set"
@@ -205,13 +205,23 @@ class TestCookieBasedFiltering:
 
     def test_clear_ignore_cookie_endpoint(self, client: Any) -> None:
         """Test the /api/cookie/clear endpoint."""
-        response = client.post("/api/cookie/clear")
+        response = client.post("/api/cookie/clear", headers=auth_headers())
         assert response.status_code == 200
         data = response.get_json()
         assert data["status"] == "cookie_cleared"
         # Cookie should be cleared (max_age=0)
         assert "rr_ignore_me" in response.headers.get("Set-Cookie", "")
         assert "Max-Age=0" in response.headers.get("Set-Cookie", "")
+
+    def test_set_cookie_requires_auth(self, client: Any) -> None:
+        """Test that /api/cookie/set requires authentication."""
+        response = client.post("/api/cookie/set")
+        assert response.status_code == 401
+
+    def test_clear_cookie_requires_auth(self, client: Any) -> None:
+        """Test that /api/cookie/clear requires authentication."""
+        response = client.post("/api/cookie/clear")
+        assert response.status_code == 401
 
     def test_settings_includes_cookie_filtering(self, client: Any) -> None:
         """Test that settings endpoint includes cookie_filtering_enabled."""

@@ -1524,6 +1524,7 @@ def export_analytics() -> Any:
 
 
 @app.route("/api/cookie/set", methods=["POST"])
+@require_admin
 def set_ignore_cookie() -> Any:
     """Set the rr_ignore_me cookie to prevent tracking when viewing sent folder.
 
@@ -1544,6 +1545,7 @@ def set_ignore_cookie() -> Any:
 
 
 @app.route("/api/cookie/clear", methods=["POST"])
+@require_admin
 def clear_ignore_cookie() -> Any:
     """Clear the rr_ignore_me cookie to re-enable tracking."""
     response = make_response(json.jsonify({"status": "cookie_cleared"}), 200)
