@@ -2,20 +2,236 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ReadReceipt Extension Popup Scaffold</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Read Receipt Extension</title>
   <style>
+    * {
+      box-sizing: border-box;
+    }
     body {
-      width: 300px;
-      font-family: sans-serif;
-      padding: 10px;
+      width: 350px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      padding: 15px;
+      margin: 0;
+      background: #f9f9f9;
     }
     h1 {
-      font-size: 1.2em;
+      font-size: 1.3em;
+      margin: 0 0 15px 0;
+      color: #333;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    h1 .icon {
+      font-size: 1.5em;
+    }
+    .section {
+      background: white;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .section-title {
+      font-size: 0.85em;
+      font-weight: 600;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 0 0 10px 0;
+    }
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .toggle-label {
+      font-size: 0.95em;
+      color: #333;
+    }
+    .toggle-switch {
+      position: relative;
+      width: 50px;
+      height: 26px;
+    }
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: 0.3s;
+      border-radius: 26px;
+    }
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+    input:checked + .toggle-slider {
+      background-color: #4CAF50;
+    }
+    input:checked + .toggle-slider:before {
+      transform: translateX(24px);
+    }
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .stat-item {
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 1.5em;
+      font-weight: bold;
+      color: #4CAF50;
+    }
+    .stat-label {
+      font-size: 0.75em;
+      color: #666;
+      margin-top: 2px;
+    }
+    .blocked-list {
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 0.85em;
+    }
+    .blocked-item {
+      padding: 8px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .blocked-item:last-child {
+      border-bottom: none;
+    }
+    .blocked-url {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #666;
+      margin-right: 8px;
+    }
+    .blocked-time {
+      font-size: 0.75em;
+      color: #999;
+      white-space: nowrap;
+    }
+    .btn {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85em;
+      width: 100%;
+      margin-top: 8px;
+      transition: background 0.2s;
+    }
+    .btn:hover {
+      background: #45a049;
+    }
+    .btn-danger {
+      background: #f44336;
+    }
+    .btn-danger:hover {
+      background: #da190b;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 20px;
+      color: #999;
+      font-size: 0.9em;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.75em;
+      font-weight: 600;
+    }
+    .status-active {
+      background: #e8f5e9;
+      color: #4CAF50;
+    }
+    .status-inactive {
+      background: #ffebee;
+      color: #f44336;
     }
   </style>
 </head>
 <body>
-  <h1>ReadReceipt Extension</h1>
-  <p>Popup scaffold ready.</p>
+  <h1>
+    <span class="icon">📧</span>
+    Read Receipt
+  </h1>
+
+  <div class="section">
+    <div class="section-title">Protection Status</div>
+    <div class="toggle-row">
+      <span class="toggle-label">Own-Open Filtering</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="blockingToggle">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="stats-row">
+      <div class="stat-item">
+        <div class="stat-value" id="blockedCount">0</div>
+        <div class="stat-label">Blocked Pixels</div>
+      </div>
+      <div class="stat-item">
+        <div class="status-badge status-active" id="statusBadge">Active</div>
+        <div class="stat-label" style="margin-top:4px;">Status</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">
+      Blocked Requests
+      <span id="blockedCountSmall" style="font-weight:normal;font-size:0.8em;color:#999;">(0)</span>
+    </div>
+    <div class="blocked-list" id="blockedList">
+      <div class="empty-state">
+        No tracking pixels blocked yet.
+        <br>
+        Pixels will be blocked when you view your sent emails.
+      </div>
+    </div>
+    <button class="btn btn-danger" id="clearBtn" style="display:none;">Clear Blocked Requests</button>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Settings</div>
+    <div class="toggle-row">
+      <span class="toggle-label">Tracking Injection</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="trackingToggle" checked>
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
 </body>
 </html>

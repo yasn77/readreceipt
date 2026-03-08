@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Read Receipt",
-  "version": "0.2.0",
-  "description": "Enable read receipts for webmail services",
+  "version": "0.3.0",
+  "description": "Enable read receipts for webmail services with own-open filtering",
   "background": {
     "service_worker": "background.js",
     "type": "module"
@@ -22,7 +22,8 @@
   "permissions": [
     "tabs",
     "storage",
-    "activeTab"
+    "activeTab",
+    "webRequest"
   ],
   "host_permissions": [
     "https://mail.google.com/*",
