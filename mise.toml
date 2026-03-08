@@ -96,4 +96,3 @@ mise run lint
 mise run test
 mise run build
 """, description = "Run full CI pipeline (lint + test + build)" }
-

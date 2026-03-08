@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const date = new Date(timestamp);
     const now = new Date();
     const diff = now - date;
-    
+
     // Less than 1 minute ago
     if (diff < 60000) {
       return 'Just now';
@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Extract just the UUID from the URL for display
       const urlParts = req.url.split('/img/');
       const uuid = urlParts[1] ? urlParts[1].substring(0, 8) + '...' : 'unknown';
-      
+
       return `
         <div class="blocked-item">
           <span class="blocked-url" title="${req.url}">/img/${uuid}</span>
@@ -122,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
   trackingToggle.addEventListener('change', () => {
     chrome.storage.sync.set({ trackingEnabled: trackingToggle.checked }, () => {
       console.log('[ReadReceipt] Tracking enabled set to:', trackingToggle.checked);
-      
+
       // Notify content script
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0] && tabs[0].id) {

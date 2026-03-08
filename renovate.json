@@ -1,9 +1,99 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    ":semanticCommits",
+    ":semanticCommitTypeAll(chore)"
   ],
-  "labels": [
-    "renovate"
-  ]
+  "labels": ["renovate", "dependencies"],
+
+  "packageRules": [
+    {
+      "description": "Group all Python dependencies into single PR",
+      "groupName": "Python dependencies",
+      "matchLanguages": ["python"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "automergeType": "branch",
+      "automergeStrategy": "squash"
+    },
+    {
+      "description": "Group all Node.js dependencies into single PR",
+      "groupName": "Node.js dependencies",
+      "matchLanguages": ["javascript", "typescript"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "automergeType": "branch",
+      "automergeStrategy": "squash"
+    },
+    {
+      "description": "Group all GitHub Actions into single PR",
+      "groupName": "GitHub Actions",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "automergeType": "branch",
+      "automergeStrategy": "squash"
+    },
+    {
+      "description": "Group Docker image updates",
+      "groupName": "Docker images",
+      "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "automergeType": "branch",
+      "automergeStrategy": "squash"
+    },
+    {
+      "description": "Separate PRs for security updates",
+      "matchUpdateTypes": ["patch"],
+      "matchPackagePatterns": ["*security*", "*vulnerability*"],
+      "groupName": null,
+      "automerge": false,
+      "labels": ["security"]
+    },
+    {
+      "description": "Separate PRs for major version updates (require manual review)",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["major-update"]
+    },
+    {
+      "description": "Auto-merge patch updates for all packages",
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "automergeType": "branch",
+      "automergeStrategy": "squash"
+    },
+    {
+      "description": "Auto-merge minor updates for non-major packages",
+      "matchUpdateTypes": ["minor"],
+      "matchPackagePatterns": ["*"],
+      "excludePackagePatterns": ["^@", "typescript"],
+      "automerge": true,
+      "automergeType": "branch",
+      "automergeStrategy": "squash"
+    }
+  ],
+
+  "platformAutomerge": true,
+  "automerge": true,
+  "automergeType": "branch",
+  "automergeStrategy": "squash",
+
+  "requiredStatusChecks": ["ci", "integration-tests"],
+
+  "schedule": ["before 6am on Monday"],
+
+  "prHourlyLimit": 2,
+  "prConcurrentLimit": 10,
+
+  "dependencyDashboard": true,
+  "dependencyDashboardAutoclose": true,
+
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"],
+    "automerge": false
+  }
 }

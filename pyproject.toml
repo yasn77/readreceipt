@@ -1,11 +1,11 @@
 [tool.ruff]
 line-length = 88
-exclude = ["__pycache__", "migrations", "helm", "node_modules", "admin-dashboard", "extensions"]
+exclude = ["__pycache__", "migrations", "helm", "node_modules", "admin-dashboard", "extensions", ".venv"]
 target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
-ignore = []
+ignore = ["E501", "E711", "N806", "F401"]
 
 [tool.black]
 line-length = 88
