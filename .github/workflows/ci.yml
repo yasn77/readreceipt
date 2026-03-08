@@ -97,7 +97,7 @@ jobs:
         if: matrix.python-version == '3.12'
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: matrix.python-version == '3.12'
         with:
           name: coverage-report-py${{ matrix.python-version }}
@@ -152,7 +152,7 @@ jobs:
           npm test -- --coverage || echo "No tests found in admin-dashboard"
 
       - name: Upload frontend coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: matrix.node-version == '20'
         with:
           name: frontend-coverage-node${{ matrix.node-version }}
@@ -199,12 +199,12 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Download backend coverage
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: coverage-report-py3.12
 
       - name: Download frontend coverage
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: frontend-coverage-node20
           path: admin-dashboard/coverage
