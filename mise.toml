@@ -29,7 +29,7 @@ pytest
 # Run linters (ruff, black, mypy)
 lint = { run = """
 echo "Running ruff..."
-ruff check .
+ruff check --config .ruff.toml .
 echo "Running black (check mode)..."
 black --check .
 echo "Running mypy..."
