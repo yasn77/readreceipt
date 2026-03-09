@@ -183,10 +183,10 @@ def setup_input_validation(app: Flask) -> None:
         # Bleach to clean HTML/script content
         cleaned = bleach.clean(value, tags=[], strip=True)
         # Limit length
-        return cleaned[:max_length]
+        return cleaned[:max_length]  # type: ignore[no-any-return]
 
     @app.before_request
-    def validate_and_sanitize_request() -> None:
+    def validate_and_sanitize_request() -> tuple[Any, int] | None:
         """Validate and sanitize incoming request data."""
         # Check Content-Length for POST/PUT requests
         content_length = request.content_length
@@ -227,6 +227,8 @@ def setup_input_validation(app: Flask) -> None:
                 header_value, MAX_HEADER_VALUE_LENGTH
             )
 
+        return None
+
     def sanitize_dict(data: dict[str, Any]) -> dict[str, Any]:
         """Recursively sanitize a dictionary."""
         cleaned = {}
@@ -234,14 +236,14 @@ def setup_input_validation(app: Flask) -> None:
             if isinstance(v, str):
                 cleaned[k] = sanitize_string(v)
             elif isinstance(v, dict):
-                cleaned[k] = sanitize_dict(v)
+                cleaned[k] = sanitize_dict(v)  # type: ignore[assignment]
             elif isinstance(v, list):
-                cleaned[k] = [
-                    sanitize_dict(i)
-                    if isinstance(i, dict)
-                    else sanitize_string(i)
-                    if isinstance(i, str)
-                    else i
+                cleaned[k] = [  # type: ignore[assignment]
+                    (
+                        sanitize_dict(i)
+                        if isinstance(i, dict)
+                        else sanitize_string(i) if isinstance(i, str) else i
+                    )
                     for i in v
                 ]
             else:
@@ -294,7 +296,7 @@ def setup_hardened_logging(app: Flask) -> None:
                 safe_kwargs[key] = value
             self.info(message, **safe_kwargs)
 
-    app.logger = SafeRequestLogger(app.logger.name)
+    app.logger = SafeRequestLogger(app.logger.name)  # type: ignore[misc]
 
 
 # Module-level storage for admin token (initialized in setup_rbac)

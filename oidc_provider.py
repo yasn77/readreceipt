@@ -377,13 +377,16 @@ class OIDCProvider:
                 audience=self._clients.keys() if self._clients else None,
             )
 
-            return jsonify(
-                {
-                    "sub": payload.get("sub"),
-                    "name": f"User {payload.get('sub')}",
-                    "email": f"{payload.get('sub')}@readreceipt.local",
-                }
-            ), 200
+            return (
+                jsonify(
+                    {
+                        "sub": payload.get("sub"),
+                        "name": f"User {payload.get('sub')}",
+                        "email": f"{payload.get('sub')}@readreceipt.local",
+                    }
+                ),
+                200,
+            )
         except jwt.InvalidTokenError:
             return jsonify({"error": "invalid_token"}), 401
 

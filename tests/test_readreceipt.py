@@ -158,9 +158,9 @@ class TestCookieBasedFiltering:
             # Verify NO tracking was recorded
             with app.app_context():
                 tracking_count = Tracking.query.count()
-                assert tracking_count == 0, (
-                    "Tracking should be skipped when cookie is present"
-                )
+                assert (
+                    tracking_count == 0
+                ), "Tracking should be skipped when cookie is present"
 
     def test_tracking_recorded_without_cookie(self) -> None:
         """Test that tracking is recorded when rr_ignore_me cookie is NOT present."""
@@ -191,9 +191,9 @@ class TestCookieBasedFiltering:
             # Verify tracking WAS recorded
             with app.app_context():
                 tracking_count = Tracking.query.count()
-                assert tracking_count == 1, (
-                    "Tracking should be recorded when cookie is absent"
-                )
+                assert (
+                    tracking_count == 1
+                ), "Tracking should be recorded when cookie is absent"
 
     def test_set_ignore_cookie_endpoint(self, client: Any) -> None:
         """Test the /api/cookie/set endpoint."""

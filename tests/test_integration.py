@@ -167,9 +167,10 @@ class TestAdminEndpoints:
         # Without auth header
         response = admin_client.get("/api/admin/recipients")
         # Should return 401/403 without valid auth
-        assert response.status_code in [401, 403], (
-            "Admin endpoint should require authentication"
-        )
+        assert response.status_code in [
+            401,
+            403,
+        ], "Admin endpoint should require authentication"
 
     def test_admin_recipients_with_auth(self, admin_client: Any) -> None:
         """Test admin recipients endpoint with valid authentication."""
@@ -226,15 +227,15 @@ class TestAppConfiguration:
 
     def test_secret_key_is_set(self) -> None:
         """Verify SECRET_KEY is configured."""
-        assert app.config.get("SECRET_KEY") is not None, (
-            "SECRET_KEY must be set for sessions and security"
-        )
+        assert (
+            app.config.get("SECRET_KEY") is not None
+        ), "SECRET_KEY must be set for sessions and security"
 
     def test_sqlalchemy_database_uri_is_set(self) -> None:
         """Verify SQLAlchemy database URI is configured."""
-        assert app.config.get("SQLALCHEMY_DATABASE_URI") is not None, (
-            "SQLALCHEMY_DATABASE_URI must be configured"
-        )
+        assert (
+            app.config.get("SQLALCHEMY_DATABASE_URI") is not None
+        ), "SQLALCHEMY_DATABASE_URI must be configured"
 
     def test_test_mode_flag_works(self) -> None:
         """Verify TESTING flag can be set."""

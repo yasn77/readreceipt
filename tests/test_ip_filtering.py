@@ -231,9 +231,9 @@ class TestIPBasedFiltering:
             # Verify tracking was NOT recorded
             with app.app_context():
                 tracking_count = Tracking.query.count()
-                assert tracking_count == 0, (
-                    "Tracking should be blocked for IP in blocklist"
-                )
+                assert (
+                    tracking_count == 0
+                ), "Tracking should be blocked for IP in blocklist"
 
     def test_tracking_allowed_when_ip_not_in_blocklist(self):
         """Test that tracking is allowed when IP is not in blocklist."""
@@ -275,9 +275,9 @@ class TestIPBasedFiltering:
             # Verify tracking WAS recorded
             with app.app_context():
                 tracking_count = Tracking.query.count()
-                assert tracking_count == 1, (
-                    "Tracking should be recorded for IP not in blocklist"
-                )
+                assert (
+                    tracking_count == 1
+                ), "Tracking should be recorded for IP not in blocklist"
 
     def test_tracking_blocked_with_multiple_admins(self):
         """Test IP blocking works when multiple admins have different blocklists."""
