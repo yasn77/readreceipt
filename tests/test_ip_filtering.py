@@ -21,8 +21,9 @@ class TestIPBlocklistEndpoints:
     def setup_test_db(self):
         """Setup fresh database for each test."""
         import tempfile
+
         # Use a file-based database with a unique path for proper isolation
-        self.db_fd, self.db_path = tempfile.mkstemp(suffix='.db')
+        self.db_fd, self.db_path = tempfile.mkstemp(suffix=".db")
         app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{self.db_path}"
         app.config["TESTING"] = True
         # Set admin token environment variable
@@ -251,7 +252,9 @@ class TestIPBasedFiltering:
 
     def test_tracking_allowed_when_ip_not_in_blocklist(self):
         """Test that tracking is allowed when IP is not in blocklist."""
-        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:?check_same_thread=False"
+        app.config["SQLALCHEMY_DATABASE_URI"] = (
+            "sqlite:///:memory:?check_same_thread=False"
+        )
         app.config["TESTING"] = True
 
         with app.app_context():
@@ -297,7 +300,9 @@ class TestIPBasedFiltering:
 
     def test_tracking_blocked_with_multiple_admins(self):
         """Test IP blocking works when multiple admins have different blocklists."""
-        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:?check_same_thread=False"
+        app.config["SQLALCHEMY_DATABASE_URI"] = (
+            "sqlite:///:memory:?check_same_thread=False"
+        )
         app.config["TESTING"] = True
 
         with app.app_context():
@@ -348,7 +353,9 @@ class TestIPBasedFiltering:
 
     def test_combined_filtering_cookie_and_ip(self):
         """Test that both cookie and IP filtering work together."""
-        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:?check_same_thread=False"
+        app.config["SQLALCHEMY_DATABASE_URI"] = (
+            "sqlite:///:memory:?check_same_thread=False"
+        )
         app.config["TESTING"] = True
 
         with app.app_context():
@@ -408,7 +415,9 @@ class TestAdminUserModel:
 
     def test_admin_user_has_ip_blocklist_field(self):
         """Test AdminUser model has ip_blocklist field."""
-        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:?check_same_thread=False"
+        app.config["SQLALCHEMY_DATABASE_URI"] = (
+            "sqlite:///:memory:?check_same_thread=False"
+        )
         app.config["TESTING"] = True
 
         with app.app_context():
