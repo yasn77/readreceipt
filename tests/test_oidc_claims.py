@@ -4,7 +4,7 @@ import json
 import os
 import unittest
 
-from app import (
+from readreceipt.app import (
     AdminUser,
     AuditLog,
     app,
@@ -266,7 +266,7 @@ class TestOIDCAuthEndpoints(unittest.TestCase):
         """Test legacy token authentication."""
         os.environ["ADMIN_TOKEN"] = "test-token"
         # Update cached _admin_token in security module
-        import security
+        from readreceipt.security import security
 
         security._admin_token = "test-token"
 
@@ -284,7 +284,7 @@ class TestOIDCAuthEndpoints(unittest.TestCase):
         """Test login with invalid token."""
         os.environ["ADMIN_TOKEN"] = "test-token"
         # Update cached _admin_token in security module
-        import security
+        from readreceipt.security import security
 
         security._admin_token = "test-token"
 
@@ -306,7 +306,7 @@ class TestOIDCAuthEndpoints(unittest.TestCase):
         """Test accessing protected endpoint with valid token."""
         os.environ["ADMIN_TOKEN"] = "test-token"
         # Update cached _admin_token in security module
-        import security
+        from readreceipt.security import security
 
         security._admin_token = "test-token"
 

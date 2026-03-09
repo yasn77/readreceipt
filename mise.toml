@@ -40,7 +40,7 @@ echo "All linters passed!"
 # Run development server
 dev = { run = """
 echo "Starting Flask development server..."
-.venv/bin/python app.py
+PYTHONPATH=src .venv/bin/python -m readreceipt.app
 """, description = "Run development server" }
 
 # Run frontend development server

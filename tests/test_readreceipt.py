@@ -5,8 +5,7 @@ from collections.abc import Generator
 from typing import Any
 
 import pytest
-
-from app import Recipients, Tracking, app, db
+from readreceipt.app import Recipients, Tracking, app, db
 
 
 @pytest.fixture
@@ -19,7 +18,7 @@ def client() -> Generator[Any, None, None]:
     import os
 
     os.environ["ADMIN_TOKEN"] = "admin"
-    import security
+    from readreceipt.security import security
 
     security._admin_token = "admin"
 

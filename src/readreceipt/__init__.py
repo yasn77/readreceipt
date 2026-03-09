@@ -8,7 +8,6 @@ except ImportError:
     pass
 
 # Re-export security
-from .security.security import init_security, require_admin
-
 # Re-export OIDC
 from .auth.oidc_provider import OIDCProvider, jwt_verification_required, validate_token
+from .security.security import init_security, require_admin

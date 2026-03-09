@@ -24,15 +24,15 @@ from flask import (
 )
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
-from PIL import Image
-from sqlalchemy_utils import CountryType, IPAddressType
-from ua_parser import user_agent_parser
 
 # Import OIDC provider
-from oidc_provider import OIDCProvider, jwt_verification_required, validate_token
+from readreceipt.auth.oidc_provider import OIDCProvider, jwt_verification_required, validate_token
+from PIL import Image
 
 # Import security module
-from security import init_security, require_admin
+from readreceipt.security.security import init_security, require_admin
+from sqlalchemy_utils import CountryType, IPAddressType
+from ua_parser import user_agent_parser
 
 app = Flask(__name__)
 # app.config ['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'

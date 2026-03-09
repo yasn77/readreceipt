@@ -7,8 +7,7 @@ import json
 import os
 
 import pytest
-
-from app import Recipients, Tracking, app, db
+from readreceipt.app import Recipients, Tracking, app, db
 
 
 @pytest.fixture
@@ -19,7 +18,7 @@ def client():
     app.config["SECRET_KEY"] = "test-secret-key"
     os.environ["ADMIN_TOKEN"] = "test-admin-token"
     # Update cached _admin_token in security module
-    import security
+    from readreceipt.security import security
 
     security._admin_token = "test-admin-token"
 
@@ -199,7 +198,7 @@ class TestLoggingHardening:
 
     def test_sensitive_data_filter(self):
         """Verify sensitive data patterns are redacted."""
-        from security import SensitiveDataFilter
+        from readreceipt.security.security import SensitiveDataFilter
 
         filter_instance = SensitiveDataFilter()
 
@@ -223,7 +222,7 @@ class TestLoggingHardening:
         """Verify tokens are redacted in logs."""
         import logging
 
-        from security import SensitiveDataFilter
+        from readreceipt.security.security import SensitiveDataFilter
 
         filter_instance = SensitiveDataFilter()
         record = logging.LogRecord(
@@ -242,7 +241,7 @@ class TestLoggingHardening:
         """Verify Bearer tokens are redacted."""
         import logging
 
-        from security import SensitiveDataFilter
+        from readreceipt.security.security import SensitiveDataFilter
 
         filter_instance = SensitiveDataFilter()
         record = logging.LogRecord(
@@ -299,7 +298,7 @@ class TestConfiguration:
         try:
             os.environ["ADMIN_TOKEN"] = "custom-admin-token"
             # Update the cached _admin_token to simulate fresh import
-            import security
+            from readreceipt.security import security
 
             original_cached_token = security._admin_token
             security._admin_token = "custom-admin-token"

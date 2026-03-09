@@ -53,7 +53,7 @@ disable_error_code = ["import-untyped"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "--cov=app --cov-report=term-missing --cov-fail-under=50 -v"
+addopts = "--cov=readreceipt --cov-report=term-missing --cov-fail-under=50 -v"
 
 [tool.coverage.run]
 source = ["."]

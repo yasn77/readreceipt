@@ -5,9 +5,8 @@ from __future__ import annotations
 from collections.abc import Generator
 
 import pytest
+from readreceipt.app import app
 from flask.testing import FlaskClient
-
-from app import app
 
 
 @pytest.fixture

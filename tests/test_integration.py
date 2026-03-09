@@ -12,13 +12,13 @@ import pytest
 
 # Test imports - this will catch import errors immediately
 try:
-    from app import (
+    from readreceipt.app import (
         Recipients,
         Tracking,
         app,
         db,
     )
-    from security import init_security, require_admin
+    from readreceipt.security.security import init_security, require_admin
 except ImportError as e:
     pytest.exit(f"Import error - app cannot start: {e}")
 
@@ -44,7 +44,7 @@ def admin_client(integration_client: Any) -> Any:
     os.environ["ADMIN_TOKEN"] = "integration-test-token"
     # Also update the cached _admin_token in security module
     # since it was set at import time when ADMIN_TOKEN wasn't set
-    import security
+    from readreceipt.security import security
 
     security._admin_token = "integration-test-token"
     return integration_client

@@ -6,8 +6,7 @@ import os
 import uuid
 
 import pytest
-
-from app import AdminUser, Recipients, Tracking, app, db
+from readreceipt.app import AdminUser, Recipients, Tracking, app, db
 
 
 class TestIPBlocklistEndpoints:
