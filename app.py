@@ -382,12 +382,18 @@ def new_uuid() -> Any:
             return jsonify({"error": "Invalid email format"}), 400
 
     # Sanitize and limit description length (Issue #107)
-    import bleach
     import re
+
+    import bleach
 
     if description:
         # First remove script tags and their contents completely
-        description = re.sub(r"<script[^>]*>.*?</script>", "", description, flags=re.DOTALL | re.IGNORECASE)
+        description = re.sub(
+            r"<script[^>]*>.*?</script>",
+            "",
+            description,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
         # Then use bleach to clean any remaining HTML
         description = bleach.clean(description, tags=[], strip=True)
         if len(description) > 500:

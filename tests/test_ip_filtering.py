@@ -23,6 +23,7 @@ class TestIPBlocklistEndpoints:
         app.config["TESTING"] = True
         # Set admin token and update security module cache
         import security
+
         security._admin_token = "admin"
 
         with app.app_context():

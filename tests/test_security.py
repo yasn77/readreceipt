@@ -20,6 +20,7 @@ def client():
     os.environ["ADMIN_TOKEN"] = "test-admin-token"
     # Update cached _admin_token in security module
     import security
+
     security._admin_token = "test-admin-token"
 
     with app.test_client() as client:
@@ -299,6 +300,7 @@ class TestConfiguration:
             os.environ["ADMIN_TOKEN"] = "custom-admin-token"
             # Update the cached _admin_token to simulate fresh import
             import security
+
             original_cached_token = security._admin_token
             security._admin_token = "custom-admin-token"
 

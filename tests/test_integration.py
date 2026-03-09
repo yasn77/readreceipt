@@ -45,6 +45,7 @@ def admin_client(integration_client: Any) -> Any:
     # Also update the cached _admin_token in security module
     # since it was set at import time when ADMIN_TOKEN wasn't set
     import security
+
     security._admin_token = "integration-test-token"
     return integration_client
 

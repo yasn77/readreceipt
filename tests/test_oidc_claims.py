@@ -264,6 +264,7 @@ class TestOIDCAuthEndpoints(unittest.TestCase):
         os.environ["ADMIN_TOKEN"] = "test-token"
         # Update cached _admin_token in security module
         import security
+
         security._admin_token = "test-token"
 
         response = self.client.post(
@@ -281,6 +282,7 @@ class TestOIDCAuthEndpoints(unittest.TestCase):
         os.environ["ADMIN_TOKEN"] = "test-token"
         # Update cached _admin_token in security module
         import security
+
         security._admin_token = "test-token"
 
         response = self.client.post(
@@ -302,6 +304,7 @@ class TestOIDCAuthEndpoints(unittest.TestCase):
         os.environ["ADMIN_TOKEN"] = "test-token"
         # Update cached _admin_token in security module
         import security
+
         security._admin_token = "test-token"
 
         response = self.client.get(
