@@ -355,6 +355,12 @@ def admin_required(f: Callable) -> Callable:
                 jsonify({"error": "Forbidden", "message": "Invalid token"}), 403
             )
 
+        # For token auth, find an admin user to set as current_admin_user
+        # This allows endpoints that require current_admin_user to work with token auth
+        admin_user = AdminUser.query.filter_by(is_active=True).first()
+        if admin_user:
+            request.current_admin_user = admin_user  # type: ignore[attr_defined]
+
         return f(*args, **kwargs)
 
     return decorated
@@ -1281,8 +1287,8 @@ def add_to_ip_blocklist() -> Any:
     if ip_address in admin_user.ip_blocklist:
         return jsonify({"error": "IP address already in blocklist"}), 409
 
-    # Add IP to blocklist
-    admin_user.ip_blocklist.append(ip_address)
+    # Add IP to blocklist (reassign to trigger SQLAlchemy change detection)
+    admin_user.ip_blocklist = (admin_user.ip_blocklist or []) + [ip_address]
     admin_user.updated_at = datetime.utcnow()
     db.session.commit()
 
@@ -1331,8 +1337,8 @@ def remove_from_ip_blocklist(ip_address: str) -> Any:
     if ip_address not in admin_user.ip_blocklist:
         return jsonify({"error": "IP address not in blocklist"}), 404
 
-    # Remove IP from blocklist
-    admin_user.ip_blocklist.remove(ip_address)
+    # Remove IP from blocklist (reassign to trigger SQLAlchemy change detection)
+    admin_user.ip_blocklist = [ip for ip in (admin_user.ip_blocklist or []) if ip != ip_address]
     admin_user.updated_at = datetime.utcnow()
     db.session.commit()
 
