@@ -5,6 +5,7 @@ from collections.abc import Generator
 from typing import Any
 
 import pytest
+
 from readreceipt.app import Recipients, Tracking, app, db
 
 

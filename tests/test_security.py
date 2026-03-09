@@ -7,6 +7,7 @@ import json
 import os
 
 import pytest
+
 from readreceipt.app import Recipients, Tracking, app, db
 
 

@@ -6,6 +6,7 @@ import os
 import uuid
 
 import pytest
+
 from readreceipt.app import AdminUser, Recipients, Tracking, app, db
 
 
