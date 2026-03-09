@@ -31,7 +31,7 @@ lint = { run = """
 echo "Running ruff..."
 ruff check --config .ruff.toml .
 echo "Running black (check mode)..."
-black --check .
+black --check --extend-exclude=".venv|venv|env" .
 echo "Running mypy..."
 mypy .
 echo "All linters passed!"
@@ -71,7 +71,7 @@ echo "Clean complete!"
 # Format code
 format = { run = """
 echo "Formatting code with black..."
-black .
+black --extend-exclude=".venv|venv|env" .
 echo "Code formatted!"
 """, description = "Format code with black" }
 
