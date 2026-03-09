@@ -1,0 +1,32 @@
+# Ruff configuration
+# This file ensures ruff properly excludes directories regardless of pyproject.toml parsing
+
+line-length = 88
+target-version = "py311"
+
+exclude = [
+    ".git",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".venv",
+    ".venv/**",
+    "venv",
+    "venv/**",
+    "env",
+    "env/**",
+    ".tox",
+    ".eggs",
+    "*.egg-info",
+    "dist",
+    "build",
+    "node_modules",
+    "helm",
+    "admin-dashboard",
+    "extensions",
+    "migrations",
+]
+
+[lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501", "E711", "N806", "F401"]

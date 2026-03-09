@@ -14,6 +14,7 @@ from typing import Any
 from authlib.integrations.flask_client import OAuth
 from flask import (
     Flask,
+    jsonify,
     make_response,
     redirect,
     request,
@@ -307,7 +308,7 @@ def get_or_create_admin_from_claims(claims: dict[str, Any]) -> AdminUser | None:
         log_audit(admin_user, "user_created", {"claims": claims})
 
     db.session.commit()
-    return admin_user
+    return admin_user  # type: ignore[no-any-return]
 
 
 def admin_required(f: Callable) -> Callable:
@@ -322,7 +323,7 @@ def admin_required(f: Callable) -> Callable:
                 # Update last login
                 admin_user.last_login = datetime.utcnow()
                 db.session.commit()
-                request.current_admin_user = admin_user
+                request.current_admin_user = admin_user  # type: ignore[attr-defined]
                 return f(*args, **kwargs)
 
         # Fallback to token-based auth (for backward compatibility)
@@ -332,7 +333,7 @@ def admin_required(f: Callable) -> Callable:
 
         if use_oidc_only and not app.config["OIDC_DISCOVERY_URL"]:
             return make_response(
-                json.jsonify(
+                jsonify(
                     {
                         "error": "Unauthorized",
                         "message": "OIDC authentication required but not configured",
@@ -343,7 +344,7 @@ def admin_required(f: Callable) -> Callable:
 
         if not auth_header:
             return make_response(
-                json.jsonify(
+                jsonify(
                     {"error": "Unauthorized", "message": "Missing Authorization header"}
                 ),
                 401,
@@ -351,8 +352,14 @@ def admin_required(f: Callable) -> Callable:
 
         if auth_header != f"Bearer {expected_token}":
             return make_response(
-                json.jsonify({"error": "Forbidden", "message": "Invalid token"}), 403
+                jsonify({"error": "Forbidden", "message": "Invalid token"}), 403
             )
+
+        # For token auth, find an admin user to set as current_admin_user
+        # This allows endpoints that require current_admin_user to work with token auth
+        admin_user = AdminUser.query.filter_by(is_active=True).first()
+        if admin_user:
+            request.current_admin_user = admin_user  # type: ignore[attr-defined]
 
         return f(*args, **kwargs)
 
@@ -365,7 +372,7 @@ def root_path() -> str:
 
 
 @app.route("/new-uuid")
-def new_uuid() -> str:
+def new_uuid() -> Any:
     this_uuid = str(uuid.uuid4())
 
     # Get and validate parameters (Issue #107)
@@ -378,12 +385,22 @@ def new_uuid() -> str:
         import re
 
         if not re.match(email_pattern, email) or len(email) > 254:
-            return json.jsonify({"error": "Invalid email format"}), 400
+            return jsonify({"error": "Invalid email format"}), 400
 
     # Sanitize and limit description length (Issue #107)
+    import re
+
     import bleach
 
     if description:
+        # First remove script tags and their contents completely
+        description = re.sub(
+            r"<script[^>]*>.*?</script>",
+            "",
+            description,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+        # Then use bleach to clean any remaining HTML
         description = bleach.clean(description, tags=[], strip=True)
         if len(description) > 500:
             description = description[:497] + "..."
@@ -409,7 +426,7 @@ def send_img(this_uuid: str) -> Any:
     r_model = Recipients.query.filter_by(r_uuid=this_uuid).first()
 
     if r_model is None:
-        return json.jsonify({"error": "Recipient not found"}), 404
+        return jsonify({"error": "Recipient not found"}), 404
 
     # Get the requesting IP address from headers (supports proxies)
     # Check X-Forwarded-For header first (for proxied requests)
@@ -542,9 +559,15 @@ def send_img(this_uuid: str) -> Any:
 def oidc_login() -> Any:
     """Initiate OIDC login flow."""
     if not app.config["OIDC_DISCOVERY_URL"]:
-        return json.jsonify(
-            {"error": "OIDC not configured", "message": "OIDC discovery URL not set"}
-        ), 503
+        return (
+            jsonify(
+                {
+                    "error": "OIDC not configured",
+                    "message": "OIDC discovery URL not set",
+                }
+            ),
+            503,
+        )
 
     redirect_uri = url_for("oidc_callback", _external=True)
     return oauth.oidc.authorize_redirect(redirect_uri)
@@ -554,20 +577,29 @@ def oidc_login() -> Any:
 def oidc_callback() -> Any:
     """Handle OIDC callback after authentication."""
     if not app.config["OIDC_DISCOVERY_URL"]:
-        return json.jsonify(
-            {"error": "OIDC not configured", "message": "OIDC discovery URL not set"}
-        ), 503
+        return (
+            jsonify(
+                {
+                    "error": "OIDC not configured",
+                    "message": "OIDC discovery URL not set",
+                }
+            ),
+            503,
+        )
 
     try:
         token = oauth.oidc.authorize_access_token()
     except Exception as e:
         app.logger.error(f"OIDC token exchange failed: {e}")
-        return json.jsonify(
-            {
-                "error": "Authentication failed",
-                "message": "Could not complete OIDC authentication",
-            }
-        ), 400
+        return (
+            jsonify(
+                {
+                    "error": "Authentication failed",
+                    "message": "Could not complete OIDC authentication",
+                }
+            ),
+            400,
+        )
 
     # Extract claims from token
     claims = extract_claims_from_token(token.get("userinfo", token))
@@ -575,9 +607,12 @@ def oidc_callback() -> Any:
     # Validate email
     email = claims.get("email")
     if not email:
-        return json.jsonify(
-            {"error": "Unauthorized", "message": "Email claim not found in token"}
-        ), 403
+        return (
+            jsonify(
+                {"error": "Unauthorized", "message": "Email claim not found in token"}
+            ),
+            403,
+        )
 
     # Check email whitelist if configured
     allowed_emails = app.config["OIDC_ALLOWED_EMAILS"]
@@ -585,9 +620,10 @@ def oidc_callback() -> Any:
         log_audit(
             None, "login_denied", {"email": email, "reason": "email_not_whitelisted"}
         )
-        return json.jsonify(
-            {"error": "Forbidden", "message": "Email not in allowed list"}
-        ), 403
+        return (
+            jsonify({"error": "Forbidden", "message": "Email not in allowed list"}),
+            403,
+        )
 
     # Map claims to admin roles and get/create user
     admin_user = get_or_create_admin_from_claims(claims)
@@ -596,9 +632,12 @@ def oidc_callback() -> Any:
         log_audit(
             admin_user, "login_denied", {"email": email, "reason": "no_admin_roles"}
         )
-        return json.jsonify(
-            {"error": "Forbidden", "message": "User does not have admin roles"}
-        ), 403
+        return (
+            jsonify(
+                {"error": "Forbidden", "message": "User does not have admin roles"}
+            ),
+            403,
+        )
 
     # Store user in session
     session["oidc_user"] = {
@@ -616,12 +655,15 @@ def oidc_callback() -> Any:
 
     # Redirect to dashboard or return JSON for API clients
     if request.headers.get("Accept") == "application/json":
-        return json.jsonify(
-            {
-                "status": "authenticated",
-                "user": admin_user.to_dict(),
-            }
-        ), 200
+        return (
+            jsonify(
+                {
+                    "status": "authenticated",
+                    "user": admin_user.to_dict(),
+                }
+            ),
+            200,
+        )
 
     return redirect("/admin/dashboard")
 
@@ -638,7 +680,7 @@ def oidc_logout() -> Any:
     session.clear()
 
     if request.headers.get("Accept") == "application/json":
-        return json.jsonify({"status": "logged_out"}), 200
+        return jsonify({"status": "logged_out"}), 200
 
     return redirect("/")
 
@@ -649,30 +691,36 @@ def get_current_user() -> Any:
     if "oidc_user" in session:
         admin_user = AdminUser.query.get(session["oidc_user"]["id"])
         if admin_user:
-            return json.jsonify(
-                {
-                    "authenticated": True,
-                    "user": admin_user.to_dict(),
-                }
-            ), 200
+            return (
+                jsonify(
+                    {
+                        "authenticated": True,
+                        "user": admin_user.to_dict(),
+                    }
+                ),
+                200,
+            )
 
     # Check for token auth
     auth_header = request.headers.get("Authorization")
     if auth_header:
         expected_token = os.environ.get("ADMIN_TOKEN", "admin")
         if auth_header == f"Bearer {expected_token}":
-            return json.jsonify(
-                {
-                    "authenticated": True,
-                    "user": {
-                        "email": "token-admin",
-                        "roles": ["admin"],
-                        "auth_type": "token",
-                    },
-                }
-            ), 200
+            return (
+                jsonify(
+                    {
+                        "authenticated": True,
+                        "user": {
+                            "email": "token-admin",
+                            "roles": ["admin"],
+                            "auth_type": "token",
+                        },
+                    }
+                ),
+                200,
+            )
 
-    return json.jsonify({"authenticated": False}), 401
+    return jsonify({"authenticated": False}), 401
 
 
 # ============================================================================
@@ -685,44 +733,50 @@ def admin_login() -> Any:
     """Admin login endpoint with token authentication."""
     # Validate request data (Issue #107)
     if not request.is_json:
-        return json.jsonify({"error": "Content-Type must be application/json"}), 400
+        return jsonify({"error": "Content-Type must be application/json"}), 400
 
     data = request.get_json()
     if not data or "token" not in data:
-        return json.jsonify({"error": "Token is required"}), 400
+        return jsonify({"error": "Token is required"}), 400
 
     token = data.get("token")
 
     # Validate token format (Issue #107)
     if not isinstance(token, str) or len(token) > 1024:
-        return json.jsonify({"error": "Invalid token format"}), 400
+        return jsonify({"error": "Invalid token format"}), 400
 
     admin_token = os.environ.get("ADMIN_TOKEN", "admin")
     use_oidc_only = os.environ.get("OIDC_ONLY", "false").lower() == "true"
 
     if use_oidc_only and app.config["OIDC_DISCOVERY_URL"]:
-        return json.jsonify(
-            {
-                "error": "Token auth disabled",
-                "message": "OIDC-only mode enabled. Use /api/auth/login",
-            }
-        ), 403
+        return (
+            jsonify(
+                {
+                    "error": "Token auth disabled",
+                    "message": "OIDC-only mode enabled. Use /api/auth/login",
+                }
+            ),
+            403,
+        )
 
     if token == admin_token:
         # Audit successful login (Issue #109)
         log_audit(None, "token_login", {"method": "token", "ip": request.remote_addr})
         app.logger.info(f"AUDIT: Admin login successful from {request.remote_addr}")
-        return json.jsonify(
-            {
-                "status": "authenticated",
-                "auth_type": "token",
-            }
-        ), 200
+        return (
+            jsonify(
+                {
+                    "status": "authenticated",
+                    "auth_type": "token",
+                }
+            ),
+            200,
+        )
 
     # Log failed login attempt (Issue #109)
     app.logger.warning(f"AUDIT: Failed admin login attempt from {request.remote_addr}")
 
-    return json.jsonify({"error": "Invalid token"}), 401
+    return jsonify({"error": "Invalid token"}), 401
 
 
 # ============================================================================
@@ -737,22 +791,25 @@ def admin_oidc_login() -> Any:
     access_token = data.get("access_token")
 
     if not access_token:
-        return json.jsonify({"error": "access_token is required"}), 400
+        return jsonify({"error": "access_token is required"}), 400
 
     # Validate the OIDC token
     payload = validate_token(access_token, oidc)
     if payload is None:
-        return json.jsonify({"error": "Invalid or expired token"}), 401
+        return jsonify({"error": "Invalid or expired token"}), 401
 
-    return json.jsonify(
-        {
-            "status": "authenticated",
-            "user": {
-                "sub": payload.get("sub"),
-                "scope": payload.get("scope"),
-            },
-        }
-    ), 200
+    return (
+        jsonify(
+            {
+                "status": "authenticated",
+                "user": {
+                    "sub": payload.get("sub"),
+                    "scope": payload.get("scope"),
+                },
+            }
+        ),
+        200,
+    )
 
 
 @app.route("/api/admin/protected", methods=["GET"])
@@ -761,16 +818,19 @@ def admin_protected() -> Any:
     """Protected admin endpoint requiring valid OIDC token."""
     # Access the decoded JWT payload from request context
     payload = request.oidc_payload  # type: ignore[attr-defined]
-    return json.jsonify(
-        {
-            "status": "access_granted",
-            "message": "Welcome to the protected area",
-            "user": {
-                "sub": payload.get("sub"),
-                "scope": payload.get("scope"),
-            },
-        }
-    ), 200
+    return (
+        jsonify(
+            {
+                "status": "access_granted",
+                "message": "Welcome to the protected area",
+                "user": {
+                    "sub": payload.get("sub"),
+                    "scope": payload.get("scope"),
+                },
+            }
+        ),
+        200,
+    )
 
 
 # ============================================================================
@@ -783,12 +843,15 @@ def admin_protected() -> Any:
 def get_admin_users() -> Any:
     """Get all admin users."""
     users = AdminUser.query.all()
-    return json.jsonify(
-        {
-            "users": [user.to_dict() for user in users],
-            "total": len(users),
-        }
-    ), 200
+    return (
+        jsonify(
+            {
+                "users": [user.to_dict() for user in users],
+                "total": len(users),
+            }
+        ),
+        200,
+    )
 
 
 @app.route("/api/admin/users/<int:user_id>", methods=["GET"])
@@ -796,7 +859,7 @@ def get_admin_users() -> Any:
 def get_admin_user(user_id: int) -> Any:
     """Get a specific admin user."""
     user = AdminUser.query.get_or_404(user_id)
-    return json.jsonify(user.to_dict()), 200
+    return jsonify(user.to_dict()), 200
 
 
 @app.route("/api/admin/users/<int:user_id>/roles", methods=["PUT"])
@@ -807,11 +870,11 @@ def update_admin_user_roles(user_id: int) -> Any:
     data = request.get_json()
 
     if not data or "roles" not in data:
-        return json.jsonify({"error": "roles field required"}), 400
+        return jsonify({"error": "roles field required"}), 400
 
     new_roles = data["roles"]
     if not isinstance(new_roles, list):
-        return json.jsonify({"error": "roles must be a list"}), 400
+        return jsonify({"error": "roles must be a list"}), 400
 
     old_roles = user.roles or []
     added_roles = set(new_roles) - set(old_roles)
@@ -823,9 +886,10 @@ def update_admin_user_roles(user_id: int) -> Any:
             AdminUser.roles != [], AdminUser.is_active
         ).count()
         if admin_count <= 1:
-            return json.jsonify(
-                {"error": "Cannot remove all roles from last admin"}
-            ), 400
+            return (
+                jsonify({"error": "Cannot remove all roles from last admin"}),
+                400,
+            )
 
     user.roles = new_roles
     user.updated_at = datetime.utcnow()
@@ -852,7 +916,7 @@ def update_admin_user_roles(user_id: int) -> Any:
             },
         )
 
-    return json.jsonify(user.to_dict()), 200
+    return jsonify(user.to_dict()), 200
 
 
 @app.route("/api/admin/users/<int:user_id>/activate", methods=["POST"])
@@ -870,7 +934,7 @@ def activate_admin_user(user_id: int) -> Any:
         {"target_user": user.email},
     )
 
-    return json.jsonify(user.to_dict()), 200
+    return jsonify(user.to_dict()), 200
 
 
 @app.route("/api/admin/users/<int:user_id>/deactivate", methods=["POST"])
@@ -884,7 +948,7 @@ def deactivate_admin_user(user_id: int) -> Any:
         AdminUser.roles != [], AdminUser.is_active, AdminUser.id != user_id
     ).count()
     if admin_count == 0:
-        return json.jsonify({"error": "Cannot deactivate last active admin"}), 400
+        return jsonify({"error": "Cannot deactivate last active admin"}), 400
 
     user.is_active = False
     user.updated_at = datetime.utcnow()
@@ -896,7 +960,7 @@ def deactivate_admin_user(user_id: int) -> Any:
         {"target_user": user.email},
     )
 
-    return json.jsonify(user.to_dict()), 200
+    return jsonify(user.to_dict()), 200
 
 
 @app.route("/api/admin/audit-logs", methods=["GET"])
@@ -917,15 +981,18 @@ def get_audit_logs() -> Any:
 
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 
-    return json.jsonify(
-        {
-            "logs": [log.to_dict() for log in pagination.items],
-            "total": pagination.total,
-            "pages": pagination.pages,
-            "current_page": page,
-            "per_page": per_page,
-        }
-    ), 200
+    return (
+        jsonify(
+            {
+                "logs": [log.to_dict() for log in pagination.items],
+                "total": pagination.total,
+                "pages": pagination.pages,
+                "current_page": page,
+                "per_page": per_page,
+            }
+        ),
+        200,
+    )
 
 
 # ============================================================================
@@ -939,7 +1006,7 @@ def get_recipients() -> Any:
     """Get all recipients."""
     recipients = Recipients.query.all()
     return (
-        json.jsonify(
+        jsonify(
             [
                 {
                     "id": r.id,
@@ -960,21 +1027,21 @@ def create_recipient() -> Any:
     """Create a new recipient."""
     # Validate input (Issue #107)
     if not request.is_json:
-        return json.jsonify({"error": "Content-Type must be application/json"}), 400
+        return jsonify({"error": "Content-Type must be application/json"}), 400
 
     data = request.get_json()
     if not data:
-        return json.jsonify({"error": "Request body is required"}), 400
+        return jsonify({"error": "Request body is required"}), 400
 
     if not data.get("email"):
-        return json.jsonify({"error": "Email is required"}), 400
+        return jsonify({"error": "Email is required"}), 400
 
     # Validate email format (Issue #107)
     import re
 
     email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
     if not re.match(email_pattern, data["email"]) or len(data["email"]) > 254:
-        return json.jsonify({"error": "Invalid email format"}), 400
+        return jsonify({"error": "Invalid email format"}), 400
 
     # Sanitize description (Issue #107)
     import bleach
@@ -1000,7 +1067,7 @@ def create_recipient() -> Any:
     )
 
     return (
-        json.jsonify(
+        jsonify(
             {
                 "id": recipient.id,
                 "r_uuid": recipient.r_uuid,
@@ -1020,11 +1087,11 @@ def update_recipient(recipient_id: int) -> Any:
 
     # Validate input (Issue #107)
     if not request.is_json:
-        return json.jsonify({"error": "Content-Type must be application/json"}), 400
+        return jsonify({"error": "Content-Type must be application/json"}), 400
 
     data = request.get_json()
     if not data:
-        return json.jsonify({"error": "Request body is required"}), 400
+        return jsonify({"error": "Request body is required"}), 400
 
     import re
 
@@ -1039,7 +1106,7 @@ def update_recipient(recipient_id: int) -> Any:
         # Validate email format
         email = data["email"]
         if not re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", email):
-            return json.jsonify({"error": "Invalid email format"}), 400
+            return jsonify({"error": "Invalid email format"}), 400
         recipient.email = email[:254]
 
     db.session.commit()
@@ -1048,7 +1115,7 @@ def update_recipient(recipient_id: int) -> Any:
     app.logger.info(f"AUDIT: Recipient {recipient_id} updated by admin")
 
     return (
-        json.jsonify(
+        jsonify(
             {
                 "id": recipient.id,
                 "r_uuid": recipient.r_uuid,
@@ -1075,7 +1142,7 @@ def delete_recipient(recipient_id: int) -> Any:
     # Audit deletion (Issue #109)
     app.logger.info(f"AUDIT: Recipient {recipient_uuid} deleted by admin")
 
-    return json.jsonify({"status": "deleted"}), 200
+    return jsonify({"status": "deleted"}), 200
 
 
 @app.route("/api/admin/stats", methods=["GET"])
@@ -1091,7 +1158,7 @@ def get_admin_stats() -> Any:
     recent_events = Tracking.query.order_by(Tracking.timestamp.desc()).limit(5).all()
 
     return (
-        json.jsonify(
+        jsonify(
             {
                 "total_recipients": total_recipients,
                 "total_events": total_events,
@@ -1117,7 +1184,7 @@ def get_admin_stats() -> Any:
 def get_settings() -> Any:
     """Get application settings."""
     return (
-        json.jsonify(
+        jsonify(
             {
                 "tracking_enabled": True,
                 "allowed_domains": os.environ.get("EXTENSION_ALLOWED_ORIGINS", ""),
@@ -1138,11 +1205,11 @@ def update_settings() -> Any:
     """Update application settings (in-memory for now)."""
     # Validate input (Issue #107)
     if not request.is_json:
-        return json.jsonify({"error": "Content-Type must be application/json"}), 400
+        return jsonify({"error": "Content-Type must be application/json"}), 400
 
     data = request.get_json()
     if not data:
-        return json.jsonify({"error": "Request body is required"}), 400
+        return jsonify({"error": "Request body is required"}), 400
 
     # Sanitize values
     import bleach
@@ -1159,7 +1226,7 @@ def update_settings() -> Any:
         f"AUDIT: Settings updated by admin - keys: {list(safe_data.keys())}"
     )
 
-    return json.jsonify({"status": "updated", "settings": safe_data}), 200
+    return jsonify({"status": "updated", "settings": safe_data}), 200
 
 
 # ============================================================================
@@ -1173,14 +1240,17 @@ def get_ip_blocklist() -> Any:
     """Get the current user's IP blocklist."""
     admin_user = getattr(request, "current_admin_user", None)
     if not admin_user:
-        return json.jsonify({"error": "Admin user not found"}), 404
+        return jsonify({"error": "Admin user not found"}), 404
 
-    return json.jsonify(
-        {
-            "ip_blocklist": admin_user.ip_blocklist or [],
-            "count": len(admin_user.ip_blocklist or []),
-        }
-    ), 200
+    return (
+        jsonify(
+            {
+                "ip_blocklist": admin_user.ip_blocklist or [],
+                "count": len(admin_user.ip_blocklist or []),
+            }
+        ),
+        200,
+    )
 
 
 @app.route("/api/admin/ip-blocklist", methods=["POST"])
@@ -1189,15 +1259,15 @@ def add_to_ip_blocklist() -> Any:
     """Add an IP address to the blocklist."""
     admin_user = getattr(request, "current_admin_user", None)
     if not admin_user:
-        return json.jsonify({"error": "Admin user not found"}), 404
+        return jsonify({"error": "Admin user not found"}), 404
 
     # Validate request data
     if not request.is_json:
-        return json.jsonify({"error": "Content-Type must be application/json"}), 400
+        return jsonify({"error": "Content-Type must be application/json"}), 400
 
     data = request.get_json()
     if not data or "ip_address" not in data:
-        return json.jsonify({"error": "ip_address is required"}), 400
+        return jsonify({"error": "ip_address is required"}), 400
 
     ip_address = data["ip_address"].strip()
 
@@ -1207,7 +1277,7 @@ def add_to_ip_blocklist() -> Any:
     try:
         ipaddress.ip_address(ip_address)
     except ValueError:
-        return json.jsonify({"error": "Invalid IP address format"}), 400
+        return jsonify({"error": "Invalid IP address format"}), 400
 
     # Initialize blocklist if None
     if admin_user.ip_blocklist is None:
@@ -1215,10 +1285,10 @@ def add_to_ip_blocklist() -> Any:
 
     # Check if IP already in blocklist
     if ip_address in admin_user.ip_blocklist:
-        return json.jsonify({"error": "IP address already in blocklist"}), 409
+        return jsonify({"error": "IP address already in blocklist"}), 409
 
-    # Add IP to blocklist
-    admin_user.ip_blocklist.append(ip_address)
+    # Add IP to blocklist (reassign to trigger SQLAlchemy change detection)
+    admin_user.ip_blocklist = (admin_user.ip_blocklist or []) + [ip_address]
     admin_user.updated_at = datetime.utcnow()
     db.session.commit()
 
@@ -1231,13 +1301,16 @@ def add_to_ip_blocklist() -> Any:
 
     app.logger.info(f"AUDIT: IP {ip_address} added to blocklist by {admin_user.email}")
 
-    return json.jsonify(
-        {
-            "status": "added",
-            "ip_address": ip_address,
-            "total_blocked": len(admin_user.ip_blocklist),
-        }
-    ), 201
+    return (
+        jsonify(
+            {
+                "status": "added",
+                "ip_address": ip_address,
+                "total_blocked": len(admin_user.ip_blocklist),
+            }
+        ),
+        201,
+    )
 
 
 @app.route("/api/admin/ip-blocklist/<ip_address>", methods=["DELETE"])
@@ -1246,7 +1319,7 @@ def remove_from_ip_blocklist(ip_address: str) -> Any:
     """Remove an IP address from the blocklist."""
     admin_user = getattr(request, "current_admin_user", None)
     if not admin_user:
-        return json.jsonify({"error": "Admin user not found"}), 404
+        return jsonify({"error": "Admin user not found"}), 404
 
     # Validate IP address format
     import ipaddress
@@ -1254,7 +1327,7 @@ def remove_from_ip_blocklist(ip_address: str) -> Any:
     try:
         ipaddress.ip_address(ip_address)
     except ValueError:
-        return json.jsonify({"error": "Invalid IP address format"}), 400
+        return jsonify({"error": "Invalid IP address format"}), 400
 
     # Initialize blocklist if None
     if admin_user.ip_blocklist is None:
@@ -1262,10 +1335,12 @@ def remove_from_ip_blocklist(ip_address: str) -> Any:
 
     # Check if IP is in blocklist
     if ip_address not in admin_user.ip_blocklist:
-        return json.jsonify({"error": "IP address not in blocklist"}), 404
+        return jsonify({"error": "IP address not in blocklist"}), 404
 
-    # Remove IP from blocklist
-    admin_user.ip_blocklist.remove(ip_address)
+    # Remove IP from blocklist (reassign to trigger SQLAlchemy change detection)
+    admin_user.ip_blocklist = [
+        ip for ip in (admin_user.ip_blocklist or []) if ip != ip_address
+    ]
     admin_user.updated_at = datetime.utcnow()
     db.session.commit()
 
@@ -1280,13 +1355,16 @@ def remove_from_ip_blocklist(ip_address: str) -> Any:
         f"AUDIT: IP {ip_address} removed from blocklist by {admin_user.email}"
     )
 
-    return json.jsonify(
-        {
-            "status": "removed",
-            "ip_address": ip_address,
-            "total_blocked": len(admin_user.ip_blocklist),
-        }
-    ), 200
+    return (
+        jsonify(
+            {
+                "status": "removed",
+                "ip_address": ip_address,
+                "total_blocked": len(admin_user.ip_blocklist),
+            }
+        ),
+        200,
+    )
 
 
 @app.route("/api/admin/ip-blocklist/validate", methods=["POST"])
@@ -1294,11 +1372,11 @@ def remove_from_ip_blocklist(ip_address: str) -> Any:
 def validate_ip_address() -> Any:
     """Validate an IP address format without adding to blocklist."""
     if not request.is_json:
-        return json.jsonify({"error": "Content-Type must be application/json"}), 400
+        return jsonify({"error": "Content-Type must be application/json"}), 400
 
     data = request.get_json()
     if not data or "ip_address" not in data:
-        return json.jsonify({"error": "ip_address is required"}), 400
+        return jsonify({"error": "ip_address is required"}), 400
 
     ip_address = data["ip_address"].strip()
 
@@ -1308,21 +1386,27 @@ def validate_ip_address() -> Any:
     try:
         parsed = ipaddress.ip_address(ip_address)
         ip_version = "IPv6" if parsed.version == 6 else "IPv4"
-        return json.jsonify(
-            {
-                "valid": True,
-                "ip_address": ip_address,
-                "version": ip_version,
-                "normalized": str(parsed),
-            }
-        ), 200
+        return (
+            jsonify(
+                {
+                    "valid": True,
+                    "ip_address": ip_address,
+                    "version": ip_version,
+                    "normalized": str(parsed),
+                }
+            ),
+            200,
+        )
     except ValueError:
-        return json.jsonify(
-            {
-                "valid": False,
-                "error": "Invalid IP address format. Use IPv4 (e.g., 192.168.1.1) or IPv6 (e.g., 2001:db8::1)",
-            }
-        ), 400
+        return (
+            jsonify(
+                {
+                    "valid": False,
+                    "error": "Invalid IP address format. Use IPv4 (e.g., 192.168.1.1) or IPv6 (e.g., 2001:db8::1)",
+                }
+            ),
+            400,
+        )
 
 
 @app.route("/api/analytics/summary", methods=["GET"])
@@ -1344,7 +1428,7 @@ def get_analytics_summary() -> Any:
     )
 
     return (
-        json.jsonify(
+        jsonify(
             {
                 "total_events": total_events,
                 "unique_recipients": unique_recipients,
@@ -1367,15 +1451,16 @@ def get_analytics_events() -> Any:
     import re
 
     if not re.match(r"^\d+d$", range_days):
-        return json.jsonify(
-            {"error": "Invalid range format. Use format like '7d', '30d'"}
-        ), 400
+        return (
+            jsonify({"error": "Invalid range format. Use format like '7d', '30d'"}),
+            400,
+        )
 
     days = int(range_days.replace("d", ""))
 
     # Limit range to prevent abuse (max 365 days)
     if days > 365 or days < 1:
-        return json.jsonify({"error": "Range must be between 1 and 365 days"}), 400
+        return jsonify({"error": "Range must be between 1 and 365 days"}), 400
 
     start_date = datetime.now() - timedelta(days=days)
 
@@ -1388,7 +1473,7 @@ def get_analytics_events() -> Any:
             daily_counts[date_str] = daily_counts.get(date_str, 0) + 1
 
     return (
-        json.jsonify(
+        jsonify(
             [
                 {"date": date, "count": count}
                 for date, count in sorted(daily_counts.items())
@@ -1411,7 +1496,7 @@ def get_analytics_recipients() -> Any:
     )
 
     return (
-        json.jsonify(
+        jsonify(
             [{"recipient_id": rid, "count": count} for rid, count in top_recipients]
         ),
         200,
@@ -1429,7 +1514,7 @@ def get_analytics_geo() -> Any:
     )
 
     return (
-        json.jsonify(
+        jsonify(
             [
                 {"country": country or "Unknown", "count": count}
                 for country, count in geo_data
@@ -1470,7 +1555,7 @@ def get_analytics_clients() -> Any:
                 client_counts["Unknown"] = client_counts.get("Unknown", 0) + 1
 
     return (
-        json.jsonify(
+        jsonify(
             [
                 {"name": name, "value": count}
                 for name, count in sorted(
@@ -1531,7 +1616,7 @@ def set_ignore_cookie() -> Any:
     This endpoint is called by the admin dashboard when the user enables
     cookie-based own-open filtering (Issue #150).
     """
-    response = make_response(json.jsonify({"status": "cookie_set"}), 200)
+    response = make_response(jsonify({"status": "cookie_set"}), 200)
     # Set cookie for 30 days, secure and httponly for security
     response.set_cookie(
         "rr_ignore_me",
@@ -1548,7 +1633,7 @@ def set_ignore_cookie() -> Any:
 @require_admin
 def clear_ignore_cookie() -> Any:
     """Clear the rr_ignore_me cookie to re-enable tracking."""
-    response = make_response(json.jsonify({"status": "cookie_cleared"}), 200)
+    response = make_response(jsonify({"status": "cookie_cleared"}), 200)
     response.set_cookie(
         "rr_ignore_me",
         "",

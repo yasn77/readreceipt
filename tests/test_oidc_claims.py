@@ -130,20 +130,21 @@ class TestAdminUserModel(unittest.TestCase):
 
     def test_create_admin_user(self):
         """Test creating an admin user."""
-        user = AdminUser(
-            email="admin@example.com",
-            oidc_sub="1234567890",
-            roles=["admin"],
-        )
-        db.session.add(user)
-        db.session.commit()
+        with app.app_context():
+            user = AdminUser(
+                email="admin@example.com",
+                oidc_sub="1234567890",
+                roles=["admin"],
+            )
+            db.session.add(user)
+            db.session.commit()
 
-        found_user = AdminUser.query.filter_by(email="admin@example.com").first()
+            found_user = AdminUser.query.filter_by(email="admin@example.com").first()
 
-        self.assertIsNotNone(found_user)
-        self.assertEqual(found_user.oidc_sub, "1234567890")
-        self.assertEqual(found_user.roles, ["admin"])
-        self.assertTrue(found_user.is_active)
+            self.assertIsNotNone(found_user)
+            self.assertEqual(found_user.oidc_sub, "1234567890")
+            self.assertEqual(found_user.roles, ["admin"])
+            self.assertTrue(found_user.is_active)
 
     def test_admin_user_has_role(self):
         """Test checking if user has a specific role."""
@@ -159,21 +160,22 @@ class TestAdminUserModel(unittest.TestCase):
 
     def test_admin_user_to_dict(self):
         """Test converting admin user to dictionary."""
-        user = AdminUser(
-            email="admin@example.com",
-            oidc_sub="1234567890",
-            roles=["admin"],
-        )
-        db.session.add(user)
-        db.session.commit()
+        with app.app_context():
+            user = AdminUser(
+                email="admin@example.com",
+                oidc_sub="1234567890",
+                roles=["admin"],
+            )
+            db.session.add(user)
+            db.session.commit()
 
-        user_dict = user.to_dict()
+            user_dict = user.to_dict()
 
-        self.assertEqual(user_dict["email"], "admin@example.com")
-        self.assertEqual(user_dict["roles"], ["admin"])
-        self.assertTrue(user_dict["is_active"])
-        self.assertIn("id", user_dict)
-        self.assertIn("created_at", user_dict)
+            self.assertEqual(user_dict["email"], "admin@example.com")
+            self.assertEqual(user_dict["roles"], ["admin"])
+            self.assertTrue(user_dict["is_active"])
+            self.assertIn("id", user_dict)
+            self.assertIn("created_at", user_dict)
 
 
 class TestAuditLog(unittest.TestCase):
@@ -197,30 +199,31 @@ class TestAuditLog(unittest.TestCase):
 
     def test_create_audit_log(self):
         """Test creating an audit log entry."""
-        user = AdminUser(
-            email="admin@example.com",
-            oidc_sub="1234567890",
-            roles=["admin"],
-        )
-        db.session.add(user)
-        db.session.commit()
+        with app.app_context():
+            user = AdminUser(
+                email="admin@example.com",
+                oidc_sub="1234567890",
+                roles=["admin"],
+            )
+            db.session.add(user)
+            db.session.commit()
 
-        log = AuditLog(
-            admin_user_id=user.id,
-            action="login",
-            details={"ip": "192.168.1.1"},
-            ip_address="192.168.1.1",
-            user_agent="Test Browser",
-        )
-        db.session.add(log)
-        db.session.commit()
+            log = AuditLog(
+                admin_user_id=user.id,
+                action="login",
+                details={"ip": "192.168.1.1"},
+                ip_address="192.168.1.1",
+                user_agent="Test Browser",
+            )
+            db.session.add(log)
+            db.session.commit()
 
-        found_log = AuditLog.query.first()
+            found_log = AuditLog.query.first()
 
-        self.assertIsNotNone(found_log)
-        self.assertEqual(found_log.action, "login")
-        self.assertEqual(found_log.admin_user_id, user.id)
-        self.assertEqual(found_log.ip_address, "192.168.1.1")
+            self.assertIsNotNone(found_log)
+            self.assertEqual(found_log.action, "login")
+            self.assertEqual(found_log.admin_user_id, user.id)
+            self.assertEqual(found_log.ip_address, "192.168.1.1")
 
 
 class TestOIDCAuthEndpoints(unittest.TestCase):
@@ -262,6 +265,10 @@ class TestOIDCAuthEndpoints(unittest.TestCase):
     def test_admin_login_token_auth(self):
         """Test legacy token authentication."""
         os.environ["ADMIN_TOKEN"] = "test-token"
+        # Update cached _admin_token in security module
+        import security
+
+        security._admin_token = "test-token"
 
         response = self.client.post(
             "/api/admin/login",
@@ -276,6 +283,10 @@ class TestOIDCAuthEndpoints(unittest.TestCase):
     def test_admin_login_invalid_token(self):
         """Test login with invalid token."""
         os.environ["ADMIN_TOKEN"] = "test-token"
+        # Update cached _admin_token in security module
+        import security
+
+        security._admin_token = "test-token"
 
         response = self.client.post(
             "/api/admin/login",
@@ -294,6 +305,10 @@ class TestOIDCAuthEndpoints(unittest.TestCase):
     def test_protected_endpoint_with_valid_token(self):
         """Test accessing protected endpoint with valid token."""
         os.environ["ADMIN_TOKEN"] = "test-token"
+        # Update cached _admin_token in security module
+        import security
+
+        security._admin_token = "test-token"
 
         response = self.client.get(
             "/api/admin/recipients", headers={"Authorization": "Bearer test-token"}
