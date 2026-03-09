@@ -48,13 +48,18 @@ jobs:
         uses: actions/cache@v5
         with:
           path: .venv
-          key: venv-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('requirements.txt', 'pyproject.toml') }}
+          key: venv-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('requirements.txt', 'pyproject.toml') }}-${{ github.run_id }}
           restore-keys: |
+            venv-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('requirements.txt', 'pyproject.toml') }}
             venv-${{ runner.os }}-py${{ matrix.python-version }}-
             venv-${{ runner.os }}-
 
       - name: Install dependencies
-        run: mise run install
+        run: |
+          echo "Python version: $(python --version)"
+          echo "Installing dependencies..."
+          mise run install
+          echo "Dependencies installed successfully!"
 
       - name: Verify app can start (import check)
         run: |
