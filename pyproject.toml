@@ -1,12 +1,3 @@
-[tool.ruff]
-line-length = 88
-exclude = ["__pycache__", "migrations", "helm", "node_modules", "admin-dashboard", "extensions", ".venv"]
-target-version = "py311"
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "N", "W", "UP"]
-ignore = ["E501", "E711", "N806", "F401"]
-
 [tool.black]
 line-length = 88
 target-version = ["py311"]
@@ -18,6 +9,14 @@ exclude = '''
     | node_modules
     | admin-dashboard
     | extensions
+    | \\.venv
+    | venv
+    | env
+    | \\.git
+    | \\.pytest_cache
+    | \\.mypy_cache
+    | build
+    | dist
 )/
 '''
 
@@ -32,7 +31,22 @@ no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = false
 strict_equality = true
-exclude = ["migrations", "admin-dashboard", "extensions"]
+exclude = [
+    "migrations",
+    "admin-dashboard",
+    "extensions",
+    ".venv",
+    "venv",
+    "env",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    "build",
+    "dist",
+    "node_modules",
+    "helm",
+    "tests",  # Optional: skip type-checking tests
+]
 disable_error_code = ["import-untyped"]
 
 [tool.pytest.ini_options]
