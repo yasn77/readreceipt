@@ -70,7 +70,7 @@ jobs:
       - name: Run integration tests
         run: |
           echo "Running integration tests..."
-          .venv/bin/python -m pytest tests/test_integration.py -v --tb=short
+          .venv/bin/python -m pytest tests/test_integration.py -v --tb=short --no-cov
 
       - name: Run unit tests
         run: |
