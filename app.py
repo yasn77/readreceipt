@@ -383,8 +383,12 @@ def new_uuid() -> Any:
 
     # Sanitize and limit description length (Issue #107)
     import bleach
+    import re
 
     if description:
+        # First remove script tags and their contents completely
+        description = re.sub(r"<script[^>]*>.*?</script>", "", description, flags=re.DOTALL | re.IGNORECASE)
+        # Then use bleach to clean any remaining HTML
         description = bleach.clean(description, tags=[], strip=True)
         if len(description) > 500:
             description = description[:497] + "..."

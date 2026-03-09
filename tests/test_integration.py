@@ -42,6 +42,10 @@ def integration_client() -> Generator[Any, None, None]:
 def admin_client(integration_client: Any) -> Any:
     """Create an authenticated admin client."""
     os.environ["ADMIN_TOKEN"] = "integration-test-token"
+    # Also update the cached _admin_token in security module
+    # since it was set at import time when ADMIN_TOKEN wasn't set
+    import security
+    security._admin_token = "integration-test-token"
     return integration_client
 
 

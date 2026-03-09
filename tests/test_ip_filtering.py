@@ -21,6 +21,9 @@ class TestIPBlocklistEndpoints:
         """Create test client with admin user."""
         app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
         app.config["TESTING"] = True
+        # Set admin token and update security module cache
+        import security
+        security._admin_token = "admin"
 
         with app.app_context():
             db.create_all()

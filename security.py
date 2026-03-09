@@ -117,7 +117,7 @@ def setup_security_headers(app: Flask) -> None:
                 "no-store, no-cache, must-revalidate, private"
             )
             response.headers["Pragma"] = "no-cache"
-            response.headers["Expires"] = "0"
+            response.headers["Expires"] = "-1"
 
         return response
 

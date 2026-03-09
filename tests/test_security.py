@@ -17,7 +17,10 @@ def client():
     app.config["TESTING"] = True
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
     app.config["SECRET_KEY"] = "test-secret-key"
-    app.config["ADMIN_TOKEN"] = "test-admin-token"
+    os.environ["ADMIN_TOKEN"] = "test-admin-token"
+    # Update cached _admin_token in security module
+    import security
+    security._admin_token = "test-admin-token"
 
     with app.test_client() as client:
         with app.app_context():
@@ -294,12 +297,10 @@ class TestConfiguration:
         original_token = os.environ.get("ADMIN_TOKEN")
         try:
             os.environ["ADMIN_TOKEN"] = "custom-admin-token"
-            # Reload app to pick up new env var
-            from importlib import reload
-
-            import app
-
-            reload(app)
+            # Update the cached _admin_token to simulate fresh import
+            import security
+            original_cached_token = security._admin_token
+            security._admin_token = "custom-admin-token"
 
             # Test with new token
             response = client.get(
@@ -307,6 +308,9 @@ class TestConfiguration:
                 headers={"Authorization": "Bearer custom-admin-token"},
             )
             assert response.status_code == 200
+
+            # Restore cached token
+            security._admin_token = original_cached_token
         finally:
             if original_token:
                 os.environ["ADMIN_TOKEN"] = original_token

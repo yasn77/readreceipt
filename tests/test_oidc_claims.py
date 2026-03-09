@@ -262,6 +262,9 @@ class TestOIDCAuthEndpoints(unittest.TestCase):
     def test_admin_login_token_auth(self):
         """Test legacy token authentication."""
         os.environ["ADMIN_TOKEN"] = "test-token"
+        # Update cached _admin_token in security module
+        import security
+        security._admin_token = "test-token"
 
         response = self.client.post(
             "/api/admin/login",
@@ -276,6 +279,9 @@ class TestOIDCAuthEndpoints(unittest.TestCase):
     def test_admin_login_invalid_token(self):
         """Test login with invalid token."""
         os.environ["ADMIN_TOKEN"] = "test-token"
+        # Update cached _admin_token in security module
+        import security
+        security._admin_token = "test-token"
 
         response = self.client.post(
             "/api/admin/login",
@@ -294,6 +300,9 @@ class TestOIDCAuthEndpoints(unittest.TestCase):
     def test_protected_endpoint_with_valid_token(self):
         """Test accessing protected endpoint with valid token."""
         os.environ["ADMIN_TOKEN"] = "test-token"
+        # Update cached _admin_token in security module
+        import security
+        security._admin_token = "test-token"
 
         response = self.client.get(
             "/api/admin/recipients", headers={"Authorization": "Bearer test-token"}

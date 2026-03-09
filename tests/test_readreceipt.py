@@ -15,6 +15,11 @@ def client() -> Generator[Any, None, None]:
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
     app.config["TESTING"] = True
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    # Set admin token and update security module cache
+    import os
+    os.environ["ADMIN_TOKEN"] = "admin"
+    import security
+    security._admin_token = "admin"
 
     with app.app_context():
         db.create_all()
