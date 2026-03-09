@@ -133,7 +133,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd admin-dashboard
-          npm ci
+          npm install
 
       - name: Run frontend tests
         run: |
