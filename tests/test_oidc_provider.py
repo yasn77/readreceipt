@@ -7,7 +7,7 @@ from collections.abc import Generator
 import pytest
 from flask.testing import FlaskClient
 
-from app import app
+from readreceipt.app import app
 
 
 @pytest.fixture

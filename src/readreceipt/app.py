@@ -29,10 +29,14 @@ from sqlalchemy_utils import CountryType, IPAddressType
 from ua_parser import user_agent_parser
 
 # Import OIDC provider
-from oidc_provider import OIDCProvider, jwt_verification_required, validate_token
+from readreceipt.auth.oidc_provider import (
+    OIDCProvider,
+    jwt_verification_required,
+    validate_token,
+)
 
 # Import security module
-from security import init_security, require_admin
+from readreceipt.security.security import init_security, require_admin
 
 app = Flask(__name__)
 # app.config ['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'

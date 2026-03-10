@@ -15,6 +15,7 @@ _.python.venv = { path = ".venv", create = true, uv_create_args = ["--seed"] }
 install = { run = """
 echo "Installing backend dependencies..."
 uv pip install -r requirements.txt
+uv pip install -e .
 echo "Installing frontend dependencies..."
 cd admin-dashboard && npm install
 echo "All dependencies installed successfully!"
@@ -40,7 +41,7 @@ echo "All linters passed!"
 # Run development server
 dev = { run = """
 echo "Starting Flask development server..."
-.venv/bin/python app.py
+PYTHONPATH=src .venv/bin/python -m readreceipt.app
 """, description = "Run development server" }
 
 # Run frontend development server

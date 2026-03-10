@@ -1,3 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "readreceipt"
+version = "0.1.0"
+description = "Email read receipt tracking"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
 [tool.black]
 line-length = 88
 target-version = ["py311"]
@@ -53,7 +68,7 @@ disable_error_code = ["import-untyped"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "--cov=app --cov-report=term-missing --cov-fail-under=50 -v"
+addopts = "--cov=readreceipt --cov-report=term-missing --cov-fail-under=50 -v"
 
 [tool.coverage.run]
 source = ["."]
@@ -83,5 +98,5 @@ show_missing = true
 
 # Override for OIDC provider module - allow arg-type due to Any in token dicts
 [[tool.mypy.overrides]]
-module = "oidc_provider"
+module = "readreceipt.auth.oidc_provider"
 disable_error_code = ["arg-type"]

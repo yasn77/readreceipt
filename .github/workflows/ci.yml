@@ -82,7 +82,7 @@ jobs:
 
       - name: Generate coverage report
         run: |
-          pytest --cov=app --cov-report=xml --cov-report=term
+          pytest --cov=readreceipt --cov-report=xml --cov-report=term
         if: matrix.python-version == '3.12'
 
       - name: Upload coverage artifact
