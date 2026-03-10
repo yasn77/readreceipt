@@ -98,5 +98,5 @@ show_missing = true
 
 # Override for OIDC provider module - allow arg-type due to Any in token dicts
 [[tool.mypy.overrides]]
-module = "oidc_provider"
+module = "readreceipt.auth.oidc_provider"
 disable_error_code = ["arg-type"]
