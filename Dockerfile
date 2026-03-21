@@ -10,7 +10,7 @@ WORKDIR /app/frontend
 COPY admin-dashboard/package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN npm ci --legacy-peer-deps
 
 # Copy frontend source
 COPY admin-dashboard/ ./
