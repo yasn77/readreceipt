@@ -9,8 +9,8 @@ WORKDIR /app/frontend
 # Copy package files
 COPY admin-dashboard/package*.json ./
 
-# Install dependencies
-RUN npm ci --legacy-peer-deps
+# Install dependencies (use npm install since --legacy-peer-deps doesn't work with npm ci)
+RUN npm install --legacy-peer-deps
 
 # Copy frontend source
 COPY admin-dashboard/ ./
