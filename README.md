@@ -6,7 +6,7 @@
 
 A comprehensive email read receipt tracking system with a Flask backend, React admin dashboard, and browser extensions for Gmail and other webmail services.
 
-**📚 [Documentation](docs/)** | **📘 [Usage Guide](docs/usage.md)** | **🤝 [Contributing](CONTRIBUTING.md)** | **📋 [Code of Conduct](CODE_OF_CONDUCT.md)**
+**📚 [Documentation](docs/)** | **📘 [Usage Guide](docs/usage.md)** | **🐳 [Docker Guide](DOCKER.md)** | **🤝 [Contributing](CONTRIBUTING.md)** | **📋 [Code of Conduct](CODE_OF_CONDUCT.md)**
 
 ## Features
 
@@ -188,35 +188,146 @@ mise run security
 
 ```
 readreceipt/
-├── app.py                 # Flask application
-├── requirements.txt       # Python dependencies
-├── pyproject.toml        # Python tool configuration
-├── manifest.json         # Chrome extension manifest
-├── content.js            # Extension content script
-├── background.js         # Extension background worker
-├── admin-dashboard/      # React admin UI
+├── src/                          # Source code
+│   └── readreceipt/
+│       ├── app.py               # Flask application
+│       ├── auth/                # Authentication modules
+│       ├── security/            # Security utilities
+│       └── utils/               # Utility functions
+├── admin-dashboard/              # React admin UI
 │   ├── src/
 │   │   ├── pages/
 │   │   ├── components/
 │   │   └── api/
 │   └── package.json
-├── tests/                # Test suite
-│   └── test_readreceipt.py
-├── stories/              # Agile user stories
-├── .github/workflows/    # CI/CD pipelines
-└── helm/                 # Kubernetes deployment
+├── migrations/                   # Database migrations
+├── tests/                        # Test suite
+├── extensions/                   # Browser extensions
+│   ├── chrome/                  # Chrome extension
+│   └── firefox/                 # Firefox extension
+├── helm/                         # Kubernetes deployment
+├── .github/workflows/            # CI/CD pipelines
+├── Dockerfile                    # Multi-stage Docker build
+├── docker-compose.yml            # Docker Compose configuration
+├── docker-entrypoint.sh          # Container entrypoint script
+├── .dockerignore                 # Docker build exclusions
+├── requirements.txt              # Python dependencies
+├── pyproject.toml               # Python tool configuration
+└── README.md                     # This file
 ```
 
 ## Deployment
 
 ### Docker
 
-```bash
-# Build image
-docker build -t readreceipt .
+ReadReceipt provides a comprehensive Docker setup with multi-stage builds for optimized production images.
 
-# Run container
-docker run -p 5000:5000 -e ADMIN_TOKEN=your-token readreceipt
+#### Quick Start with Docker
+
+```bash
+# Build the Docker image
+docker build -t readreceipt:latest .
+
+# Run with Docker (minimal setup)
+docker run -d \
+  --name readreceipt \
+  -p 8000:8000 \
+  -e ADMIN_TOKEN=your-secure-token \
+  -e SQLALCHEMY_DATABASE_URI=sqlite:////app/data/readreceipt.db \
+  -v readreceipt-data:/app/data \
+  readreceipt:latest
+```
+
+#### Docker Compose (Recommended)
+
+The easiest way to run ReadReceipt is with Docker Compose:
+
+```bash
+# Copy environment file
+cp .env.example .env
+
+# Edit .env with your settings (especially ADMIN_TOKEN)
+nano .env
+
+# Start the application
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the application
+docker-compose down
+
+# Stop and remove volumes (WARNING: deletes data)
+docker-compose down -v
+```
+
+#### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ADMIN_TOKEN` | Admin authentication token (required) | `change-me-in-production` |
+| `SQLALCHEMY_DATABASE_URI` | Database connection string | `sqlite:////app/data/readreceipt.db` |
+| `EXTENSION_ALLOWED_ORIGINS` | Comma-separated allowed domains | `https://mail.google.com,https://outlook.live.com` |
+| `LOG_LEVEL` | Logging level (DEBUG, INFO, WARNING, ERROR) | `INFO` |
+| `PORT` | Server port | `8000` |
+| `FLASK_ENV` | Flask environment | `production` |
+
+#### Docker Build Stages
+
+The Dockerfile uses multi-stage builds for optimization:
+
+1. **frontend-builder**: Builds the React admin dashboard
+2. **python-deps**: Installs Python dependencies
+3. **production**: Final image combining backend and frontend
+
+To build a specific stage:
+
+```bash
+# Build only the frontend
+docker build --target frontend-builder -t readreceipt-frontend .
+
+# Build only Python dependencies
+docker build --target python-deps -t readreceipt-deps .
+```
+
+#### Production Deployment
+
+For production deployments:
+
+```bash
+# Use PostgreSQL instead of SQLite (uncomment in docker-compose.yml)
+# Set secure credentials
+docker-compose up -d
+
+# Scale the application (if using an external database)
+docker-compose up -d --scale readreceipt=3
+```
+
+#### Health Checks
+
+The Docker image includes a health check endpoint:
+
+```bash
+# Check application health
+curl http://localhost:8000/health
+```
+
+#### Volume Persistence
+
+Data is persisted using Docker volumes:
+
+- `readreceipt-data`: SQLite database and application data
+- Mount point: `/app/data`
+
+To backup data:
+
+```bash
+# Create backup
+docker run --rm -v readreceipt-data:/data -v $(pwd):/backup alpine tar czf /backup/readreceipt-backup.tar.gz -C /data .
+
+# Restore backup
+docker run --rm -v readreceipt-data:/data -v $(pwd):/backup alpine sh -c "cd /data && tar xzf /backup/readreceipt-backup.tar.gz"
 ```
 
 ### Kubernetes (Helm)

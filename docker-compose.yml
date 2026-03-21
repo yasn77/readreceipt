@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  readreceipt:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: readreceipt:latest
+    container_name: readreceipt
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      - FLASK_ENV=${FLASK_ENV:-production}
+      - FLASK_DEBUG=${FLASK_DEBUG:-false}
+      - PORT=${PORT:-8000}
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-change-me-in-production}
+      - SQLALCHEMY_DATABASE_URI=${SQLALCHEMY_DATABASE_URI:-sqlite:////app/data/readreceipt.db}
+      - EXTENSION_ALLOWED_ORIGINS=${EXTENSION_ALLOWED_ORIGINS:-https://mail.google.com,https://outlook.live.com}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PROMETHEUS_MULTIPROC_DIR=${PROMETHEUS_MULTIPROC_DIR:-/tmp/prometheus}
+    volumes:
+      - readreceipt-data:/app/data
+      - /tmp/prometheus:/tmp/prometheus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - readreceipt-network
+
+  # Optional: PostgreSQL database (uncomment to use instead of SQLite)
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: readreceipt-db
+  #   restart: unless-stopped
+  #   environment:
+  #     - POSTGRES_USER=readreceipt
+  #     - POSTGRES_PASSWORD=${DB_PASSWORD:-changeme}
+  #     - POSTGRES_DB=readreceipt
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   networks:
+  #     - readreceipt-network
+  #   ports:
+  #     - "5432:5432"
+
+  # Optional: Redis for caching/sessions (uncomment if needed)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: readreceipt-redis
+  #   restart: unless-stopped
+  #   networks:
+  #     - readreceipt-network
+
+volumes:
+  readreceipt-data:
+    driver: local
+  # postgres-data:
+  #   driver: local
+
+networks:
+  readreceipt-network:
+    driver: bridge

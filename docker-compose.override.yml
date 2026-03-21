@@ -1,0 +1,23 @@
+# Docker Compose Override for Development
+# This file is automatically loaded by docker-compose when present
+# It adds development-specific configurations without modifying the main compose file
+
+version: '3.8'
+
+services:
+  readreceipt:
+    build:
+      target: production
+    volumes:
+      # Mount source code for hot-reload during development
+      - ./src:/app/src:ro
+      # Mount migrations
+      - ./migrations:/app/migrations:ro
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=true
+      - LOG_LEVEL=DEBUG
+    command: ["gunicorn", "--bind=0.0.0.0:8000", "--reload", "--workers=2", "src.readreceipt.app:app"]
+    ports:
+      - "8000:8000"
+      - "5678:5678"  # For remote debugging

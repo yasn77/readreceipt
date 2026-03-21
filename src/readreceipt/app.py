@@ -371,7 +371,12 @@ def admin_required(f: Callable) -> Callable:
 
 
 @app.route("/")
-def root_path() -> str:
+def root_path() -> Any:
+    """Serve admin dashboard if built, otherwise return empty response."""
+    static_folder = os.path.join(os.path.dirname(__file__), "static")
+    index_path = os.path.join(static_folder, "index.html")
+    if os.path.exists(index_path):
+        return send_file(index_path)
     return ""
 
 
@@ -1647,3 +1652,67 @@ def clear_ignore_cookie() -> Any:
         samesite="Lax",
     )
     return response
+
+
+# ============================================================================
+# Health Check Endpoint (for Docker/Kubernetes)
+# ============================================================================
+
+
+@app.route("/health")
+def health_check() -> Any:
+    """Health check endpoint for Docker and Kubernetes."""
+    try:
+        # Check database connectivity
+        db.session.execute("SELECT 1")
+        return jsonify({"status": "healthy", "database": "connected"}), 200
+    except Exception as e:
+        return jsonify({"status": "unhealthy", "error": str(e)}), 503
+
+
+# ============================================================================
+# Static File Serving (for Docker deployment)
+# ============================================================================
+
+
+# Serve static files from the static folder (built frontend)
+@app.route("/static/<path:filename>")
+def serve_static(filename: str) -> Any:
+    """Serve static files (JS, CSS, images)."""
+    static_folder = os.path.join(os.path.dirname(__file__), "static")
+    if os.path.exists(os.path.join(static_folder, filename)):
+        return send_file(os.path.join(static_folder, filename))
+    return jsonify({"error": "Not found"}), 404
+
+
+# Serve index.html for the admin dashboard
+@app.route("/admin")
+def admin_dashboard() -> Any:
+    """Serve the admin dashboard SPA."""
+    static_folder = os.path.join(os.path.dirname(__file__), "static")
+    index_path = os.path.join(static_folder, "index.html")
+    if os.path.exists(index_path):
+        return send_file(index_path)
+    return jsonify({"error": "Admin dashboard not built"}), 404
+
+
+# Catch-all route for SPA routing (must be last)
+@app.route("/<path:path>")
+def catch_all(path: str) -> Any:
+    """Catch-all route to support SPA client-side routing."""
+    # API routes should return 404
+    if path.startswith("api/"):
+        return jsonify({"error": "Not found"}), 404
+
+    # Try to serve static files
+    static_folder = os.path.join(os.path.dirname(__file__), "static")
+    file_path = os.path.join(static_folder, path)
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        return send_file(file_path)
+
+    # Serve index.html for all other routes (SPA routing)
+    index_path = os.path.join(static_folder, "index.html")
+    if os.path.exists(index_path):
+        return send_file(index_path)
+
+    return jsonify({"error": "Not found"}), 404
