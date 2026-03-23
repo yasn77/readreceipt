@@ -19,7 +19,7 @@ COPY admin-dashboard/ ./
 RUN npm run build
 
 # Stage 2: Python Dependencies
-FROM python:3.11-slim AS python-deps
+FROM python:3.14-slim AS python-deps
 
 WORKDIR /app
 
@@ -35,7 +35,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Stage 3: Final Production Image
-FROM python:3.11-slim AS production
+FROM python:3.14-slim AS production
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
