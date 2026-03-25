@@ -17,7 +17,7 @@ echo "Installing backend dependencies..."
 uv pip install -r requirements.txt
 uv pip install -e .
 echo "Installing frontend dependencies..."
-cd admin-dashboard && npm install
+cd admin-dashboard && npm install --legacy-peer-deps
 echo "All dependencies installed successfully!"
 """, description = "Install all dependencies (backend + frontend)" }
 
