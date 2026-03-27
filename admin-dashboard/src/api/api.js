@@ -30,7 +30,7 @@ api.interceptors.request.use(async (config) => {
     if (user && user.access_token) {
       config.headers.Authorization = `Bearer ${user.access_token}`
     }
-  } catch (error) {
+  } catch {
     // No valid token, will be handled by response interceptor
   }
   return config
