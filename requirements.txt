@@ -5,7 +5,7 @@ Flask-Migrate==4.1.0
 Flask-Limiter==4.1.1
 Pillow==12.1.1
 SQLAlchemy-Utils==0.42.1
-gunicorn==25.1.0
+gunicorn==25.3.0
 psycopg2-binary==2.9.11
 ua-parser==1.0.1
 bleach==6.3.0
@@ -16,19 +16,19 @@ cryptography==46.0.5
 
 # OIDC Authentication
 Authlib==1.6.9
-requests==2.33.0
+requests==2.33.1
 
 # Testing
 pytest==9.0.2
-pytest-cov==7.0.0
+pytest-cov==7.1.0
 
 # Linting and type checking
-ruff==0.15.6
+ruff==0.15.8
 black==26.3.1
 mypy==1.19.1
 
 # Type stubs
-types-requests==2.32.4.20260107
+types-requests==2.33.0.20260327
 types-flask==1.1.6
 
 # Pre-commit
