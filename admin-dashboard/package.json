@@ -22,7 +22,7 @@
   "devDependencies": {
     "@testing-library/jest-dom": "^6.2.0",
     "@testing-library/react": "^16.0.0",
-    "@vitejs/plugin-react": "^5.0.0",
+    "@vitejs/plugin-react": "^6.0.0",
     "autoprefixer": "^10.4.17",
     "eslint": "^10.0.0",
     "eslint-plugin-react": "^7.33.2",
