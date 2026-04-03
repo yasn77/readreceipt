@@ -12,7 +12,7 @@ bleach==6.3.0
 
 # OIDC and JWT support
 PyJWT==2.12.1
-cryptography==46.0.5
+cryptography==46.0.6
 
 # OIDC Authentication
 Authlib==1.6.9
