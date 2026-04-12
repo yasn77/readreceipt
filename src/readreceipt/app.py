@@ -25,6 +25,7 @@ from flask import (
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from PIL import Image
+from sqlalchemy import text
 from sqlalchemy_utils import CountryType, IPAddressType
 from ua_parser import user_agent_parser
 
@@ -1664,7 +1665,7 @@ def health_check() -> Any:
     """Health check endpoint for Docker and Kubernetes."""
     try:
         # Check database connectivity
-        db.session.execute("SELECT 1")
+        db.session.execute(text("SELECT 1"))
         return jsonify({"status": "healthy", "database": "connected"}), 200
     except Exception as e:
         return jsonify({"status": "unhealthy", "error": str(e)}), 503
