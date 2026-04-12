@@ -86,7 +86,7 @@ function Login({ onLogin }) {
             Read Receipt Admin
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Sign in with your organisation's SSO
+            Sign in with your organisation&apos;s SSO
           </p>
         </div>
 

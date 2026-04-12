@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 /**
@@ -18,20 +18,10 @@ function IPFiltering() {
   // Auth token from localStorage
   const authToken = localStorage.getItem('authToken');
 
-  useEffect(() => {
-    // Check if authenticated
-    if (!authToken) {
-      navigate('/login');
-      return;
-    }
-
-    fetchIpBlocklist();
-  }, [authToken, navigate]);
-
   /**
    * Fetch current IP blocklist
    */
-  const fetchIpBlocklist = async () => {
+  const fetchIpBlocklist = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch('/api/admin/ip-blocklist', {
@@ -56,7 +46,17 @@ function IPFiltering() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [authToken, navigate]);
+
+  useEffect(() => {
+    // Check if authenticated
+    if (!authToken) {
+      navigate('/login');
+      return;
+    }
+
+    fetchIpBlocklist();
+  }, [authToken, navigate, fetchIpBlocklist]);
 
   /**
    * Validate IP address format

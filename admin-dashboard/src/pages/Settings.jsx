@@ -7,9 +7,14 @@ function Settings() {
     allowed_domains: '',
     log_level: 'INFO'
   })
+  const [cookieSetting, setCookieSetting] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+
+  const handleCookieToggle = (checked) => {
+    setCookieSetting(checked)
+  }
 
   useEffect(() => {
     loadSettings()
