@@ -15,7 +15,7 @@ PyJWT==2.12.1
 cryptography==46.0.7
 
 # OIDC Authentication
-Authlib==1.6.9
+Authlib==1.6.10
 requests==2.33.1
 
 # Testing
@@ -25,7 +25,7 @@ pytest-cov==7.1.0
 # Linting and type checking
 ruff==0.15.10
 black==26.3.1
-mypy==1.20.0
+mypy==1.20.1
 
 # Type stubs
 types-requests==2.33.0.20260408
