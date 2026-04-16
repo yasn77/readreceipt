@@ -18,6 +18,7 @@
     "oidc-client-ts": "^3.5.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-is": "^19.0.0",
     "react-oidc-context": "^3.3.1",
     "react-router-dom": "^7.0.0",
     "recharts": "^3.0.0"
