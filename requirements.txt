@@ -15,7 +15,7 @@ PyJWT==2.12.1
 cryptography==46.0.7
 
 # OIDC Authentication
-Authlib==1.6.10
+Authlib==1.6.11
 requests==2.33.1
 
 # Testing
