@@ -16,19 +16,19 @@ cryptography==48.0.0
 
 # OIDC Authentication
 Authlib==1.7.2
-requests==2.33.1
+requests==2.34.2
 
 # Testing
 pytest==9.0.3
 pytest-cov==7.1.0
 
 # Linting and type checking
-ruff==0.15.12
-black==26.3.1
+ruff==0.15.13
+black==26.5.1
 mypy==2.1.0
 
 # Type stubs
-types-requests==2.33.0.20260503
+types-requests==2.33.0.20260518
 types-flask==1.1.6
 
 # Pre-commit
