@@ -11,7 +11,7 @@ env:
 
 jobs:
   build-push-image:
-    runs-on: readreceipt
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       packages: write
