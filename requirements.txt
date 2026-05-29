@@ -23,7 +23,7 @@ pytest==9.0.3
 pytest-cov==7.1.0
 
 # Linting and type checking
-ruff==0.15.14
+ruff==0.15.15
 black==26.5.1
 mypy==2.1.0
 
@@ -38,5 +38,5 @@ pre-commit==4.6.0
 prometheus-flask-exporter==0.23.2
 
 # Security scanning
-safety==3.7.0
+safety==3.8.0
 bandit==1.9.4
