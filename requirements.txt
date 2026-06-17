@@ -8,11 +8,11 @@ SQLAlchemy-Utils==0.42.1
 gunicorn==26.0.0
 psycopg2-binary==2.9.12
 ua-parser==1.0.2
-bleach==6.3.0
+bleach==6.4.0
 
 # OIDC and JWT support
 PyJWT==2.13.0
-cryptography==48.0.0
+cryptography==48.0.1
 
 # OIDC Authentication
 Authlib==1.7.2
