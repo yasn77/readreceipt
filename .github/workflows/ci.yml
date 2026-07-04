@@ -36,7 +36,7 @@ jobs:
 
   # Backend tests with Python matrix
   backend-tests:
-    runs-on: ubuntu-latest
+    runs-on: readreceipt
     strategy:
       fail-fast: false
       matrix:
@@ -86,7 +86,7 @@ jobs:
 
   # Frontend tests with Node matrix
   frontend-tests:
-    runs-on: ubuntu-latest
+    runs-on: readreceipt
     strategy:
       fail-fast: false
       matrix:
@@ -173,7 +173,7 @@ jobs:
 
   # Upload coverage to Codecov (after all tests complete)
   upload-coverage:
-    runs-on: ubuntu-latest
+    runs-on: readreceipt
     needs: [backend-tests, frontend-tests]
     steps:
       - uses: actions/checkout@v6

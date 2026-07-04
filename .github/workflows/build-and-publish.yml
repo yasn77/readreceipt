@@ -2,8 +2,8 @@ name: Create and publish image/chart to Github
 
 on:
   push:
-    branches: ['master']
-    tags: [ v* ]
+    branches: ["master"]
+    tags: [v*]
 
 env:
   REGISTRY: ghcr.io
@@ -11,7 +11,7 @@ env:
 
 jobs:
   build-push-image:
-    runs-on: ubuntu-latest
+    runs-on: readreceipt
     permissions:
       contents: write
       packages: write
