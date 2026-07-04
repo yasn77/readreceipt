@@ -1,9 +1,9 @@
 name: CI
 on:
   push:
-    branches: [ feat/64-ci-pipelines ]
+    branches: [feat/64-ci-pipelines]
   pull_request:
-    branches: [ feat/64-ci-pipelines ]
+    branches: [feat/64-ci-pipelines]
 jobs:
   build:
     runs-on: readreceipt
