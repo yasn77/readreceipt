@@ -14,7 +14,7 @@ concurrency:
 jobs:
   # Security scanning (Issue #110)
   security-scan:
-    runs-on: readreceipt
+    runs-on: myrunners
     steps:
       - uses: actions/checkout@v6
 
@@ -36,7 +36,7 @@ jobs:
 
   # Backend tests with Python matrix
   backend-tests:
-    runs-on: readreceipt
+    runs-on: myrunners
     strategy:
       fail-fast: false
       matrix:
@@ -86,7 +86,7 @@ jobs:
 
   # Frontend tests with Node matrix
   frontend-tests:
-    runs-on: readreceipt
+    runs-on: myrunners
     strategy:
       fail-fast: false
       matrix:
@@ -141,7 +141,7 @@ jobs:
 
   # Extension tests
   extension-tests:
-    runs-on: readreceipt
+    runs-on: myrunners
     steps:
       - uses: actions/checkout@v6
 
@@ -173,7 +173,7 @@ jobs:
 
   # Upload coverage to Codecov (after all tests complete)
   upload-coverage:
-    runs-on: readreceipt
+    runs-on: myrunners
     needs: [backend-tests, frontend-tests]
     steps:
       - uses: actions/checkout@v6
